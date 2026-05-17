@@ -1,9 +1,10 @@
 {
   "name": "ai-proxy",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "dev": "node --watch server.mjs"
+    "queue": "node src/queue/daemon.mjs",
+    "dev":   "node --watch server.mjs & node --watch src/queue/daemon.mjs"
   }
 }

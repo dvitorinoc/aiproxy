@@ -3,13 +3,9 @@
  * Descobre ferramentas via tools/list e roteia tool_calls para o servidor correto.
  */
 
-import { spawn } from 'child_process'
-import config from '../../config.mjs'
-
-const NVM_NODE  = config.path.nvmNode
-const LOCAL_BIN = config.path.localBin
-const FULL_PATH = `${NVM_NODE}:${LOCAL_BIN}:/usr/local/bin:/usr/bin:/bin`
-const BASE_ENV  = { ...process.env, PATH: FULL_PATH }
+import { spawn }        from 'child_process'
+import config           from '../../config.mjs'
+import { ENV as BASE_ENV } from '../utils/env.mjs'
 
 // ─── Conexão com um servidor MCP ──────────────────────────────────
 

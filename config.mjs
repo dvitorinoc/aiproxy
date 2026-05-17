@@ -33,4 +33,14 @@ export default {
 
   // SSE: intervalo de poll da API Laravel para broadcast ao frontend (ms)
   ssePollMs: 1_000,
+
+  // Fila de execução (daemon separado)
+  queue: {
+    port:           9091,
+    maxConcurrent:  3,
+    maxQueueSize:   50,           // 0 = ilimitado
+    jobTimeoutMs:   300_000,
+    dbPath:         './queue.db',
+    cleanupAfterMs: 24 * 60 * 60 * 1_000,
+  },
 }
