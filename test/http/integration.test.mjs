@@ -1,28 +1,33 @@
 import { describe, it, mock, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'http'
-import { request } from 'http'
+import { request }      from 'http'
 
 // ─── Mocks ────────────────────────────────────────────────────────
 
-const mockExecute = mock.fn(async () => ({ output: 'test output', usage: { request_count: 1, source: 'provider', input_tokens: 1, output_tokens: 1, total_tokens: 2, cached_tokens: null, reasoning_tokens: null, raw: null } }))
+const mockExecute = mock.fn(async () => ({
+  output: 'test output',
+  usage: { request_count: 1, source: 'provider', input_tokens: 1, output_tokens: 1, total_tokens: 2, cached_tokens: null, reasoning_tokens: null, raw: null },
+}))
 
 mock.module('../../src/services/run.service.mjs', {
-  defaultExport: { execute: mockExecute },
+  exports: { default: { execute: mockExecute } },
 })
 
 mock.module('../../src/services/providers.service.mjs', {
-  defaultExport: {
-    getAvailability: () => ({
-      claude: { available: true },
-      gemini: { available: false },
-      codex:  { available: false },
-    }),
+  exports: {
+    default: {
+      getAvailability: () => ({
+        claude: { available: true },
+        gemini: { available: false },
+        codex:  { available: false },
+      }),
+    },
   },
 })
 
 mock.module('../../src/sse/broadcaster.mjs', {
-  namedExports: {
+  exports: {
     addClient:    mock.fn(),
     removeClient: mock.fn(),
     triggerPoll:  mock.fn(),
@@ -31,8 +36,17 @@ mock.module('../../src/sse/broadcaster.mjs', {
   },
 })
 
+// Providers mock — avoids loading the full provider chain (which needs full config)
+mock.module('../../src/providers/index.mjs', {
+  exports: {
+    PROVIDERS:       { claude: {}, gemini: {}, codex: {} },
+    SUGGESTED_MODELS: { claude: ['sonnet'], gemini: [''], codex: [''] },
+    PROVIDER_BINARY:  { claude: 'claude', gemini: 'gemini', codex: 'codex' },
+  },
+})
+
 mock.module('../../config.mjs', {
-  defaultExport: { port: 0 },
+  exports: { default: { port: 0 } },
 })
 
 // ─── Server setup ─────────────────────────────────────────────────
@@ -40,10 +54,10 @@ mock.module('../../config.mjs', {
 let server, serverPort
 
 before(async () => {
-  const { createRouter }  = await import('../../src/http/router.mjs')
-  const setupRoutes       = (await import('../../src/http/routes.mjs')).default
-  const cors              = (await import('../../src/http/middleware/cors.mjs')).default
-  const errorHandler      = (await import('../../src/http/middleware/error-handler.mjs')).default
+  const { createRouter } = await import('../../src/http/router.mjs')
+  const setupRoutes      = (await import('../../src/http/routes.mjs')).default
+  const cors             = (await import('../../src/http/middleware/cors.mjs')).default
+  const errorHandler     = (await import('../../src/http/middleware/error-handler.mjs')).default
 
   const router = createRouter()
   router.use(cors)
@@ -55,7 +69,7 @@ before(async () => {
   serverPort = server.address().port
 })
 
-after(() => server.close())
+after(() => server?.close())
 
 // ─── HTTP helper ──────────────────────────────────────────────────
 
@@ -66,9 +80,9 @@ function req(method, path, body) {
       headers: body ? { 'Content-Type': 'application/json' } : {},
     }
     const r = request(opts, res => {
-      let data = ''
-      res.on('data', c => { data += c })
-      res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(data), headers: res.headers }))
+      let d = ''
+      res.on('data', c => { d += c })
+      res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(d), headers: res.headers }))
     })
     r.on('error', reject)
     if (body) r.write(JSON.stringify(body))
@@ -99,25 +113,21 @@ describe('POST /run', () => {
     assert.ok(body.error.includes('gpt4'))
   })
 
-  it('returns 400 for malformed JSON body', async () => {
+  it('returns 400 for malformed JSON', async () => {
     const { status } = await new Promise((resolve, reject) => {
       const r = request(
         { hostname: '127.0.0.1', port: serverPort, method: 'POST', path: '/run',
           headers: { 'Content-Type': 'application/json' } },
-        res => {
-          let d = ''
-          res.on('data', c => { d += c })
-          res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(d) }))
-        }
+        res => { let d = ''; res.on('data', c => { d += c }); res.on('end', () => resolve({ status: res.statusCode })) }
       )
       r.on('error', reject)
-      r.write('not json at all')
+      r.write('not json')
       r.end()
     })
     assert.equal(status, 400)
   })
 
-  it('returns 503 when runService throws QueueUnavailableError', async () => {
+  it('returns 503 queue_unavailable on QueueUnavailableError', async () => {
     const { QueueUnavailableError } = await import('../../src/utils/errors.mjs')
     mockExecute.mock.mockImplementationOnce(async () => { throw new QueueUnavailableError() })
     const { status, body } = await req('POST', '/run', { provider: 'claude', content: 'hi' })
@@ -125,7 +135,7 @@ describe('POST /run', () => {
     assert.equal(body.error, 'queue_unavailable')
   })
 
-  it('returns 503 provider_unavailable when runService throws ProviderUnavailableError', async () => {
+  it('returns 503 provider_unavailable on ProviderUnavailableError', async () => {
     const { ProviderUnavailableError } = await import('../../src/utils/errors.mjs')
     mockExecute.mock.mockImplementationOnce(async () => { throw new ProviderUnavailableError('claude') })
     const { status, body } = await req('POST', '/run', { provider: 'claude', content: 'hi' })
@@ -136,7 +146,7 @@ describe('POST /run', () => {
 })
 
 describe('GET /health', () => {
-  it('returns 200 with ok and providers list', async () => {
+  it('returns 200 with ok, providers and suggested_models', async () => {
     const { status, body } = await req('GET', '/health', null)
     assert.equal(status, 200)
     assert.equal(body.ok, true)
@@ -155,26 +165,24 @@ describe('GET /providers', () => {
 })
 
 describe('CORS', () => {
-  it('OPTIONS preflight returns 204', async () => {
+  it('OPTIONS returns 204', async () => {
     const { status } = await new Promise((resolve, reject) => {
-      const r = request(
-        { hostname: '127.0.0.1', port: serverPort, method: 'OPTIONS', path: '/run' },
-        res => resolve({ status: res.statusCode })
-      )
+      const r = request({ hostname: '127.0.0.1', port: serverPort, method: 'OPTIONS', path: '/run' },
+        res => resolve({ status: res.statusCode }))
       r.on('error', reject)
       r.end()
     })
     assert.equal(status, 204)
   })
 
-  it('regular responses include CORS header', async () => {
+  it('responses include CORS header', async () => {
     const { headers } = await req('GET', '/health', null)
     assert.equal(headers['access-control-allow-origin'], '*')
   })
 })
 
 describe('404', () => {
-  it('returns 404 for unknown route', async () => {
+  it('unknown route returns 404', async () => {
     const { status } = await req('GET', '/unknown', null)
     assert.equal(status, 404)
   })

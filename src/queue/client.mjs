@@ -10,6 +10,10 @@ import {
 const BASE    = `http://localhost:${config.queue.port}`
 const POLL_MS = config.queue.pollMs ?? 1_000
 
+function isConnRefused(err) {
+  return err.code === 'ECONNREFUSED' || err.cause?.code === 'ECONNREFUSED'
+}
+
 export async function submit(params) {
   const job_id = randomUUID()
 
@@ -20,7 +24,7 @@ export async function submit(params) {
       body:    JSON.stringify({ job_id, ...params }),
     })
   } catch (err) {
-    if (err.code === 'ECONNREFUSED') throw new QueueUnavailableError()
+    if (isConnRefused(err)) throw new QueueUnavailableError()
     throw err
   }
 
@@ -33,7 +37,7 @@ export async function submit(params) {
     try {
       res = await fetch(`${BASE}/result/${job_id}`)
     } catch (err) {
-      if (err.code === 'ECONNREFUSED') throw new QueueUnavailableError()
+      if (isConnRefused(err)) throw new QueueUnavailableError()
       continue
     }
 

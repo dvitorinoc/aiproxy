@@ -7,22 +7,21 @@ const mockRunMcpLoop = mock.fn(async (rawCall) => {
 })
 
 mock.module('../../src/mcp/loop.mjs', {
-  namedExports: { runMcpLoop: mockRunMcpLoop },
+  exports: { runMcpLoop: mockRunMcpLoop },
 })
 
 const claudeRaw = mock.fn(async () => ({ output: 'claude-output', usage: {} }))
 const geminiRaw = mock.fn(async () => ({ output: 'gemini-output', usage: {} }))
 const codexRaw  = mock.fn(async () => ({ output: 'codex-output',  usage: {} }))
 
-mock.module('../../src/providers/claude.mjs', { defaultExport: claudeRaw })
-mock.module('../../src/providers/gemini.mjs', { defaultExport: geminiRaw })
-mock.module('../../src/providers/codex.mjs',  { defaultExport: codexRaw  })
+mock.module('../../src/providers/claude.mjs', { exports: { default: claudeRaw } })
+mock.module('../../src/providers/gemini.mjs', { exports: { default: geminiRaw } })
+mock.module('../../src/providers/codex.mjs',  { exports: { default: codexRaw  } })
 
 let PROVIDERS, SUGGESTED_MODELS, PROVIDER_BINARY
-
 before(async () => {
-  const m = await import('../../src/providers/index.mjs')
-  PROVIDERS       = m.PROVIDERS
+  const m       = await import('../../src/providers/index.mjs')
+  PROVIDERS      = m.PROVIDERS
   SUGGESTED_MODELS = m.SUGGESTED_MODELS
   PROVIDER_BINARY  = m.PROVIDER_BINARY
 })
@@ -43,7 +42,7 @@ describe('PROVIDERS', () => {
 })
 
 describe('wrapProvider — call without MCP', () => {
-  it('delegates to raw function directly', async () => {
+  it('delegates directly to raw', async () => {
     claudeRaw.mock.resetCalls()
     await PROVIDERS.claude.call('sys', [], 'content', 'model', false, '/cwd')
     assert.equal(claudeRaw.mock.calls.length, 1)
@@ -61,7 +60,7 @@ describe('wrapProvider — call with MCP', () => {
 })
 
 describe('SUGGESTED_MODELS', () => {
-  it('has entries for all providers', () => {
+  it('has arrays for all providers', () => {
     assert.ok(Array.isArray(SUGGESTED_MODELS.claude))
     assert.ok(Array.isArray(SUGGESTED_MODELS.gemini))
     assert.ok(Array.isArray(SUGGESTED_MODELS.codex))
@@ -69,7 +68,7 @@ describe('SUGGESTED_MODELS', () => {
 })
 
 describe('PROVIDER_BINARY', () => {
-  it('maps each provider to its binary name', () => {
+  it('maps provider names to binary names', () => {
     assert.equal(PROVIDER_BINARY.claude, 'claude')
     assert.equal(PROVIDER_BINARY.gemini, 'gemini')
     assert.equal(PROVIDER_BINARY.codex,  'codex')

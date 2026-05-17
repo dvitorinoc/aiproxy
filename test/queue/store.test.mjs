@@ -2,7 +2,7 @@ import { describe, it, mock, before, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 
 mock.module('../../config.mjs', {
-  defaultExport: { queue: { dbPath: ':memory:', cleanupAfterMs: 86_400_000 } },
+  exports: { default: { queue: { dbPath: ':memory:', cleanupAfterMs: 86_400_000 } } },
 })
 
 let store
@@ -11,7 +11,6 @@ before(async () => {
 })
 
 beforeEach(() => {
-  // Each call to initialize() creates a fresh :memory: database
   store.initialize()
 })
 
@@ -28,8 +27,7 @@ describe('enqueue + getJob', () => {
   it('INSERT OR IGNORE: does not duplicate on repeated enqueue', () => {
     store.enqueue('id1', { content: 'first' })
     store.enqueue('id1', { content: 'second' })
-    const job = store.getJob('id1')
-    assert.deepEqual(job.payload, { content: 'first' })
+    assert.deepEqual(store.getJob('id1').payload, { content: 'first' })
   })
 
   it('returns null for unknown id', () => {
@@ -38,11 +36,10 @@ describe('enqueue + getJob', () => {
 })
 
 describe('markRunning', () => {
-  it('sets status to running and started_at', () => {
+  it('sets status to running', () => {
     store.enqueue('id1', {})
     store.markRunning('id1')
-    const job = store.getJob('id1')
-    assert.equal(job.status, 'running')
+    assert.equal(store.getJob('id1').status, 'running')
   })
 })
 
@@ -84,30 +81,12 @@ describe('getPending', () => {
   })
 })
 
-describe('initialize crash recovery', () => {
-  it('resets running jobs to pending on re-initialize', () => {
-    store.enqueue('id1', {})
-    store.markRunning('id1')
-    // Simulate crash by calling initialize() again (reassigns db to new :memory:)
-    // A new :memory: db starts empty — this tests the SQL reset logic on an existing db
-    // To test the reset specifically, we need to re-use the same db:
-    // Mark running, then call initialize() without reassigning db
-    // Since initialize() reassigns db to a new :memory:, we test this indirectly:
-    // After markRunning, calling initialize() creates a fresh db (reset happens there)
-    // We verify by checking that a job manually inserted as 'running' is reset to 'pending'
-    assert.equal(store.getPending().length, 0) // fresh db after beforeEach
-  })
-})
-
 describe('cleanup', () => {
-  it('removes old completed and failed jobs', () => {
+  it('does not delete recent completed jobs (within cleanupAfterMs)', () => {
     store.enqueue('id1', {})
     store.markCompleted('id1', { output: 'ok' })
-    // Force finished_at to be in the past by manipulating via the module's behavior
-    // cleanup() deletes where finished_at < (now - cleanupAfterMs)
-    // cleanupAfterMs = 86_400_000 (24h) — completed job just now won't be deleted
     store.cleanup()
-    assert.ok(store.getJob('id1') !== null) // recent job survives
+    assert.ok(store.getJob('id1') !== null)
   })
 
   it('does not delete pending jobs', () => {

@@ -2,14 +2,16 @@ import { describe, it, mock, before } from 'node:test'
 import assert from 'node:assert/strict'
 
 mock.module('../../src/utils/path.mjs', {
-  namedExports: {
+  exports: {
     isBinaryAvailable: mock.fn(name => name === 'claude'),
     resolveExecCwd: mock.fn(() => undefined),
   },
 })
 
 mock.module('../../src/providers/index.mjs', {
-  namedExports: {
+  exports: {
+    PROVIDERS: {},
+    SUGGESTED_MODELS: {},
     PROVIDER_BINARY: { claude: 'claude', gemini: 'gemini', codex: 'codex' },
   },
 })
@@ -21,18 +23,18 @@ before(async () => {
 })
 
 describe('providers.service.getAvailability', () => {
-  it('returns availability map for all providers', () => {
+  it('returns map with all providers', () => {
     const result = service.getAvailability()
     assert.ok('claude' in result)
     assert.ok('gemini' in result)
     assert.ok('codex'  in result)
   })
 
-  it('marks claude as available (mocked isBinaryAvailable returns true for claude)', () => {
+  it('claude is available (mock returns true for claude)', () => {
     assert.equal(service.getAvailability().claude.available, true)
   })
 
-  it('marks gemini as unavailable', () => {
+  it('gemini is unavailable (mock returns false)', () => {
     assert.equal(service.getAvailability().gemini.available, false)
   })
 })
