@@ -3,8 +3,10 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server.mjs",
-    "queue": "node src/queue/daemon.mjs",
-    "dev":   "node --watch server.mjs & node --watch src/queue/daemon.mjs"
+    "start":      "node server.mjs",
+    "queue":      "node src/queue/daemon.mjs",
+    "dev":        "node --watch server.mjs & node --watch src/queue/daemon.mjs",
+    "start:all":  "bash start.sh",
+    "stop:all":   "bash stop.sh"
   }
 }
