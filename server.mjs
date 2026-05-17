@@ -13,18 +13,19 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'fs'
 import { tmpdir } from 'os'
+import config from './config.mjs'
 
-const PORT       = 9090
-const __dirname  = dirname(fileURLToPath(import.meta.url))
+const PORT        = config.port
+const LARAVEL_API = config.laravelApi
+const __dirname   = dirname(fileURLToPath(import.meta.url))
 
-const NVM_NODE  = '/home/douglas/.nvm/versions/node/v24.15.0/bin'
-const LOCAL_BIN = '/home/douglas/.local/bin'
+const NVM_NODE  = config.path.nvmNode
+const LOCAL_BIN = config.path.localBin
 const FULL_PATH = `${NVM_NODE}:${LOCAL_BIN}:/usr/local/bin:/usr/bin:/bin`
 const ENV       = { ...process.env, PATH: FULL_PATH }
 
-const MCP_SERVER  = join(__dirname, 'mcp-server.mjs')
-const NODE_BIN    = join(NVM_NODE, 'node')
-const LARAVEL_API = 'http://localhost:8000/api'
+const MCP_SERVER = join(__dirname, 'mcp-server.mjs')
+const NODE_BIN   = join(NVM_NODE, 'node')
 
 // ─── Modelos sugeridos ─────────────────────────────────────────────
 export const SUGGESTED_MODELS = {
@@ -460,8 +461,8 @@ async function mcpToolCall(name, args) {
       }
 
       // 2. Poll até decision_response ser preenchida (timeout: 4 horas)
-      const POLL_MS    = 3_000
-      const TIMEOUT_MS = 4 * 60 * 60 * 1_000
+      const POLL_MS    = config.mcp.askUser.pollMs
+      const TIMEOUT_MS = config.mcp.askUser.timeoutMs
       const deadline   = Date.now() + TIMEOUT_MS
 
       while (Date.now() < deadline) {
@@ -521,7 +522,7 @@ async function runMcpLoop(rawCall, systemPrompt, messages, content, model, cwd) 
   const sysWithTools = (systemPrompt?.trim() ? systemPrompt + '\n\n' : '') + TOOL_SYSTEM_ADDITION
   let loopMessages   = [...(messages ?? [])]
   let loopContent    = content
-  const MAX_ITER     = 6
+  const MAX_ITER     = config.mcp.maxIterations
   let cumulativeUsage = { ...emptyUsage(), request_count: 0 }
 
   for (let i = 0; i < MAX_ITER; i++) {
@@ -571,7 +572,7 @@ const PROVIDERS = {
 
       const { stdout } = await spawnWithStdin(
         'claude', args,
-        { cwd: execCwd, env: ENV, timeout: 180_000 },
+        { cwd: execCwd, env: ENV, timeout: config.timeouts.claude },
         userContent
       )
       return parseProviderPayload('claude', stdout)
@@ -593,7 +594,7 @@ const PROVIDERS = {
       args.push('-o', 'json')
       const { stdout } = await spawnWithStdin(
         'gemini', args,
-        { cwd: execCwd, env: ENV, timeout: 180_000 },
+        { cwd: execCwd, env: ENV, timeout: config.timeouts.gemini },
         prompt
       )
       return parseProviderPayload('gemini', stdout.replace(/Ripgrep is not available.*\n/g, '').trim())
@@ -618,7 +619,7 @@ const PROVIDERS = {
         args.push('--json', '-o', outputFile)
         const { stdout } = await spawnWithStdin(
           'codex', args,
-          { cwd: execCwd, env: ENV, timeout: 240_000 },
+          { cwd: execCwd, env: ENV, timeout: config.timeouts.codex },
           prompt
         )
         let finalOutput = ''
@@ -677,7 +678,7 @@ async function pollAndBroadcast() {
   }
 }
 
-setInterval(pollAndBroadcast, 1000)
+setInterval(pollAndBroadcast, config.ssePollMs)
 
 // ─── HTTP Server ───────────────────────────────────────────────────
 function json(res, status, data) {
