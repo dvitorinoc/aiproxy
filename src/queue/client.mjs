@@ -7,8 +7,8 @@ import {
   ProviderUnavailableError,
 } from '../utils/errors.mjs'
 
-const BASE     = `http://localhost:${config.queue.port}`
-const POLL_MS  = 1_000
+const BASE    = `http://localhost:${config.queue.port}`
+const POLL_MS = config.queue.pollMs ?? 1_000
 
 export async function submit(params) {
   const job_id = randomUUID()
