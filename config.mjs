@@ -23,11 +23,12 @@ export default {
   // Loop de ferramentas MCP
   mcp: {
     maxIterations: 6,
-    // ask_user: intervalo de poll e timeout máximo de espera por resposta humana
-    askUser: {
-      pollMs:    3_000,
-      timeoutMs: 4 * 60 * 60 * 1_000,
-    },
+
+    // Servidores MCP externos (stdio). Cada entrada spawna um processo separado.
+    // O proxy descobre as ferramentas via tools/list e roteia tool_calls automaticamente.
+    // Exemplo:
+    //   { name: 'meu-projeto', command: 'node', args: ['../meu-projeto/mcp-server.mjs'] }
+    servers: [],
   },
 
   // SSE: intervalo de poll da API Laravel para broadcast ao frontend (ms)

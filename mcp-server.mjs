@@ -1,14 +1,16 @@
 /**
- * AI Proxy MCP Server (stdio transport)
- * Expõe a API backend como tools MCP.
+ * Template de MCP Server para uso com o AI Proxy (stdio transport).
  *
- * Tools:
- *   get_task                  → estado completo da task + subtasks
- *   list_agents               → agentes disponíveis com role e status
- *   reassign_subtask          → muda o agente de uma subtask
- *   update_subtask_instructions → atualiza descrição de uma subtask
- *   add_subtask               → cria nova subtask dinamicamente
- *   skip_subtask              → marca subtask como concluída sem execução
+ * Copie este arquivo para o seu projeto, defina suas ferramentas em TOOLS e
+ * implemente os handlers em callTool(). Depois registre o servidor em config.mjs:
+ *
+ *   mcp: {
+ *     servers: [
+ *       { name: 'meu-projeto', command: 'node', args: ['../meu-projeto/mcp-server.mjs'] }
+ *     ]
+ *   }
+ *
+ * Protocolo: JSON-RPC 2.0 com Content-Length framing sobre stdio.
  */
 
 const API = process.env.AI_PROXY_API || process.env.AUTOFORGE_API || 'http://localhost:8000/api'
