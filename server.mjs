@@ -44,6 +44,15 @@ function resolveExecCwd(cwd) {
   }
 }
 
+const PROVIDER_BINARY = { claude: 'claude', gemini: 'gemini', codex: 'codex' }
+
+function isBinaryAvailable(name) {
+  for (const dir of FULL_PATH.split(':')) {
+    try { statSync(join(dir, name)); return true } catch {}
+  }
+  return false
+}
+
 function claudeWorkspaceArgs(cwd) {
   const execCwd = resolveExecCwd(cwd)
   return execCwd ? ['--add-dir', execCwd] : []
@@ -719,6 +728,14 @@ const server = createServer(async (req, res) => {
     })
   }
 
+  if (req.method === 'GET' && req.url === '/providers') {
+    const providers = {}
+    for (const [name, binary] of Object.entries(PROVIDER_BINARY)) {
+      providers[name] = { available: isBinaryAvailable(binary) }
+    }
+    return json(res, 200, { providers })
+  }
+
   if (req.method === 'POST' && req.url === '/run') {
     let body = ''
     req.on('data', chunk => (body += chunk))
@@ -762,6 +779,12 @@ const server = createServer(async (req, res) => {
           usage: result?.usage ?? emptyUsage(),
         })
       } catch (err) {
+        const unavailable = err.code === 'ENOENT' || /exit 127|not found|No such file/i.test(err.message)
+        if (unavailable) {
+          const { provider = 'claude' } = safeJsonParse(body) ?? {}
+          console.error(`[${ts()}] ✗ provider unavailable: ${provider}`)
+          return json(res, 503, { error: 'provider_unavailable', provider })
+        }
         console.error(`[${ts()}] ✗`, err.message)
         return json(res, 500, { error: err.message })
       }

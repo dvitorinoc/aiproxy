@@ -32,8 +32,34 @@ curl -X POST http://localhost:9090/run \
 ### 2. Eventos em Tempo Real (`GET /events`)
 Interface SSE (Server-Sent Events) para monitorar o estado das tasks e agentes do AutoForge em tempo real. Utilizado principalmente pelo frontend.
 
-### 3. Health Check (`GET /health`)
+### 3. Disponibilidade de Provedores (`GET /providers`)
+Consulta quais CLIs de IA estão instaladas e disponíveis no sistema.
+
+**Resposta:**
+```json
+{
+  "providers": {
+    "claude": { "available": true },
+    "gemini": { "available": false },
+    "codex":  { "available": true }
+  }
+}
+```
+
+Útil para o frontend desabilitar seletores de providers não instalados.
+
+### 4. Health Check (`GET /health`)
 Retorna o status do proxy e os modelos sugeridos.
+
+---
+
+## Respostas de Erro
+
+| Status | Corpo | Descrição |
+| :--- | :--- | :--- |
+| `400` | `{ "error": "Provider inválido: xyz" }` | Provider desconhecido ou campo obrigatório ausente |
+| `500` | `{ "error": "<mensagem>" }` | Falha genérica durante a execução |
+| `503` | `{ "error": "provider_unavailable", "provider": "gemini" }` | CLI do provider não está instalada no sistema |
 
 ---
 
@@ -44,6 +70,8 @@ O proxy interage com as CLIs instaladas no sistema:
 - **Claude:** Usa a CLI `claude`.
 - **Gemini:** Usa a CLI `gemini`.
 - **Codex:** Usa a CLI `codex`.
+
+Todos os providers recebem o prompt via **stdin** (`spawn` sem shell), eliminando limitações de tamanho de argumento e problemas de escaping.
 
 ### Loop de Ferramentas (MCP)
 Quando `use_mcp: true` é enviado, o proxy injeta automaticamente definições de ferramentas no `system_prompt` e entra em um loop de execução. O modelo pode chamar ferramentas como:
