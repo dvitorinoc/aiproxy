@@ -1,5 +1,5 @@
 {
-  "name": "autoforge-ai-proxy",
+  "name": "ai-proxy",
   "version": "1.0.0",
   "type": "module",
   "scripts": {

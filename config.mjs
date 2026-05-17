@@ -1,4 +1,4 @@
-// AutoForge AI Proxy — configurações centralizadas
+// AI Proxy — configurações centralizadas
 
 export default {
   // Porta HTTP do proxy

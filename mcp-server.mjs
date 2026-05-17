@@ -1,6 +1,6 @@
 /**
- * AutoForge MCP Server (stdio transport)
- * Expõe a API do AutoForge como tools MCP para o Oracle.
+ * AI Proxy MCP Server (stdio transport)
+ * Expõe a API backend como tools MCP.
  *
  * Tools:
  *   get_task                  → estado completo da task + subtasks
@@ -11,7 +11,7 @@
  *   skip_subtask              → marca subtask como concluída sem execução
  */
 
-const API = process.env.AUTOFORGE_API || 'http://localhost:8000/api'
+const API = process.env.AI_PROXY_API || process.env.AUTOFORGE_API || 'http://localhost:8000/api'
 
 // ─── HTTP helper ──────────────────────────────────────────────────
 async function api(method, path, body) {
@@ -186,7 +186,7 @@ async function dispatch(msg) {
         result = {
           protocolVersion: '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'autoforge-mcp', version: '1.0.0' },
+          serverInfo: { name: 'ai-proxy-mcp', version: '1.0.0' },
         }
         break
 

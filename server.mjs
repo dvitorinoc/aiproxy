@@ -1,9 +1,9 @@
 /**
- * AutoForge AI Proxy
+ * AI Proxy
  * POST /run  { provider, model?, system_prompt, messages?, content, use_mcp?, cwd? }
  * GET  /health
  *
- * Sessions  → backend envia `messages` (histórico); proxy constrói conversa multi-turn
+ * Sessions  → cliente envia `messages` (histórico); proxy constrói conversa multi-turn
  * MCP       → quando use_mcp=true, proxy executa loop de tools para qualquer provider
  */
 
@@ -82,8 +82,8 @@ function spawnWithStdin(bin, args, opts, stdinData) {
 
 function geminiWorkspaceArgs(cwd) {
   const execCwd       = resolveExecCwd(cwd)
-  const autoforgeBase = join(__dirname, '..')
-  const args = ['--include-directories', autoforgeBase, '--skip-trust', '--approval-mode', 'yolo']
+  const baseDir = join(__dirname, '..')
+  const args = ['--include-directories', baseDir, '--skip-trust', '--approval-mode', 'yolo']
   if (execCwd) args.push('--include-directories', execCwd)
   return args
 }
@@ -339,7 +339,7 @@ function parseProviderPayload(provider, stdout, fallbackOutput = '') {
 // ─── MCP Tool Loop ─────────────────────────────────────────────────
 
 const TOOL_SYSTEM_ADDITION = `
-## Ferramentas Disponíveis (AutoForge MCP)
+## Ferramentas Disponíveis (MCP)
 
 Para usar uma ferramenta, inclua na sua resposta:
 <tool_call>
@@ -610,7 +610,7 @@ const PROVIDERS = {
     raw: async (systemPrompt, messages, content, model, cwd) => {
       const prompt     = buildPrompt(systemPrompt, messages, content)
       const execCwd    = resolveExecCwd(cwd)
-      const tempDir    = mkdtempSync(join(tmpdir(), 'autoforge-codex-'))
+      const tempDir    = mkdtempSync(join(tmpdir(), 'ai-proxy-codex-'))
       const outputFile = join(tempDir, 'last-message.txt')
       try {
         const args = ['exec']
@@ -797,7 +797,7 @@ const server = createServer(async (req, res) => {
 })
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🤖 AutoForge AI Proxy  http://0.0.0.0:${PORT}`)
+  console.log(`\n🤖 AI Proxy  http://0.0.0.0:${PORT}`)
   console.log(`   Providers : ${Object.keys(PROVIDERS).join(' · ')}`)
   console.log(`   MCP       : loop de tools via XML (todos os providers)`)
   console.log(`   Sessions  : histórico multi-turn via messages[]`)

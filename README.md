@@ -1,8 +1,25 @@
-# AutoForge AI Proxy
+# AI Proxy
 
 Serviço intermediário que unifica o acesso a múltiplos provedores de IA (Claude, Gemini, Codex) através de uma API REST. Suporta conversas multi-turn, execução de ferramentas via MCP e eventos em tempo real via SSE.
 
-Roda na porta **9090**, fora do Docker, pois invoca CLIs instaladas no host.
+---
+
+## Requisitos
+
+- Node.js 18+
+- CLIs dos providers desejados instaladas e disponíveis no PATH:
+  - [Claude CLI](https://docs.anthropic.com/claude/docs/claude-cli)
+  - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+  - [Codex CLI](https://github.com/openai/codex)
+
+## Instalação e uso
+
+```bash
+npm start        # porta padrão 9090
+npm run dev      # com reload automático
+```
+
+A porta e demais configurações podem ser ajustadas em `config.mjs`.
 
 ---
 
@@ -12,7 +29,7 @@ Roda na porta **9090**, fora do Docker, pois invoca CLIs instaladas no host.
 | :--- | :--- | :--- |
 | `POST` | `/run` | Executa um prompt em um provider de IA |
 | `GET` | `/providers` | Lista quais CLIs estão disponíveis no sistema |
-| `GET` | `/events` | Stream SSE de tasks e agentes em tempo real |
+| `GET` | `/events` | Stream SSE de eventos em tempo real |
 | `GET` | `/health` | Status do proxy e modelos sugeridos |
 
 ---
@@ -31,8 +48,8 @@ Envia um prompt a um provider e retorna a resposta gerada.
 | `model` | string | | Modelo específico do provider (ex: `claude-sonnet-4-6`) |
 | `system_prompt` | string | | Instruções de sistema para o modelo |
 | `content` | string | ✓ | Mensagem atual do usuário |
-| `messages` | array | | Histórico da conversa — veja [Sessions](#sessions) |
-| `use_mcp` | boolean | | Ativa o loop de ferramentas AutoForge (padrão: `false`) |
+| `messages` | array | | Histórico da conversa — veja [Sessions](#sessions-conversas-multi-turn) |
+| `use_mcp` | boolean | | Ativa o loop de ferramentas MCP (padrão: `false`) |
 | `cwd` | string | | Diretório de trabalho para acesso ao filesystem |
 
 **Resposta de sucesso — `200 OK`**
@@ -61,8 +78,8 @@ curl -X POST http://localhost:9090/run \
      -H "Content-Type: application/json" \
      -d '{
        "provider": "claude",
-       "system_prompt": "Você é um assistente de desenvolvimento.",
-       "content": "Explique o que é uma closure em JavaScript."
+       "system_prompt": "You are a helpful assistant.",
+       "content": "What is a closure in JavaScript?"
      }'
 ```
 
@@ -70,7 +87,7 @@ curl -X POST http://localhost:9090/run \
 
 ### `GET /providers`
 
-Verifica quais CLIs de IA estão instaladas e disponíveis no PATH do sistema. Não spawna processos — consulta o PATH diretamente.
+Verifica quais CLIs de IA estão instaladas e disponíveis no PATH. Não spawna processos — consulta o PATH diretamente.
 
 **Resposta — `200 OK`**
 
@@ -84,20 +101,18 @@ Verifica quais CLIs de IA estão instaladas e disponíveis no PATH do sistema. N
 }
 ```
 
-Use este endpoint para desabilitar seletores de provider não instalados na UI antes de tentar executar.
-
 ---
 
 ### `GET /events`
 
-Stream SSE que o frontend consome para atualizar o kanban em tempo real. O proxy consulta a API Laravel a cada 1 segundo e emite `event: update` sempre que tasks ou agentes mudam.
+Stream SSE que emite `event: update` sempre que o estado do backend muda. O proxy consulta a URL configurada em `config.mjs` (`laravelApi`) a cada `ssePollMs` milissegundos.
 
 **Conectar:**
 
 ```js
 const es = new EventSource('http://localhost:9090/events')
 es.addEventListener('update', e => {
-  const { tasks, agents, busy_agents, max_concurrent_agents } = JSON.parse(e.data)
+  const data = JSON.parse(e.data)
 })
 ```
 
@@ -128,21 +143,19 @@ es.addEventListener('update', e => {
 | `500` | `{ "error": "<mensagem de erro>" }` | Falha na execução do CLI |
 | `503` | `{ "error": "provider_unavailable", "provider": "gemini" }` | Binário do provider não encontrado no PATH |
 
-O `503` é distinto do `500` para permitir que o backend trate indisponibilidade de provider diferente de erros de execução.
-
 ---
 
 ## Sessions (Conversas Multi-turn)
 
-O proxy é **stateless**: não armazena histórico entre requisições. O cliente (backend Laravel) é responsável por manter o histórico e enviá-lo completo a cada turno via `messages`.
+O proxy é **stateless**: não armazena histórico entre requisições. O cliente é responsável por manter o histórico e enviá-lo completo a cada turno via `messages`.
 
 ### Formato do histórico
 
 ```json
 "messages": [
-  { "role": "user",      "content": "Qual é a capital da França?" },
-  { "role": "assistant", "content": "A capital da França é Paris." },
-  { "role": "user",      "content": "E da Alemanha?" }
+  { "role": "user",      "content": "What is the capital of France?" },
+  { "role": "assistant", "content": "The capital of France is Paris." },
+  { "role": "user",      "content": "And Germany?" }
 ]
 ```
 
@@ -169,11 +182,11 @@ Assistente:
 <content>
 ```
 
-**Exceção — Claude:** o `system_prompt` é entregue via flag `--system-prompt` separada do restante. O histórico + mensagem atual seguem via stdin. Gemini e Codex recebem tudo mesclado em um único bloco de texto via stdin.
+**Exceção — Claude:** o `system_prompt` é entregue via flag `--system-prompt` separada do restante. O histórico + mensagem atual seguem via stdin. Gemini e Codex recebem tudo mesclado em um único bloco via stdin.
 
-### Todos os providers recebem o prompt via stdin
+### Entrega via stdin
 
-O proxy usa `spawn` sem shell para todos os providers. O prompt é escrito diretamente no stdin do processo filho, sem passar por argumentos de linha de comando. Isso elimina limitações de tamanho (ARG_MAX) e problemas de escaping com conteúdo arbitrário.
+O proxy usa `spawn` sem shell para todos os providers. O prompt é escrito diretamente no stdin do processo filho, sem passar por argumentos de linha de comando — eliminando limitações de tamanho (ARG_MAX) e problemas de escaping com conteúdo arbitrário.
 
 ### Exemplo: conversa de dois turnos
 
@@ -181,8 +194,8 @@ O proxy usa `spawn` sem shell para todos os providers. O prompt é escrito diret
 
 ```bash
 curl -X POST http://localhost:9090/run \
-     -d '{ "provider": "claude", "content": "Meu nome é Douglas." }'
-# → "Olá, Douglas! Como posso ajudar?"
+     -d '{ "provider": "claude", "content": "My name is Alice." }'
+# → "Hello, Alice! How can I help you?"
 ```
 
 **Turno 2 — com histórico:**
@@ -192,64 +205,60 @@ curl -X POST http://localhost:9090/run \
      -d '{
        "provider": "claude",
        "messages": [
-         { "role": "user",      "content": "Meu nome é Douglas." },
-         { "role": "assistant", "content": "Olá, Douglas! Como posso ajudar?" }
+         { "role": "user",      "content": "My name is Alice." },
+         { "role": "assistant", "content": "Hello, Alice! How can I help you?" }
        ],
-       "content": "Qual é o meu nome?"
+       "content": "What is my name?"
      }'
-# → "Seu nome é Douglas."
+# → "Your name is Alice."
 ```
 
 ---
 
 ## Loop de Ferramentas MCP
 
-Quando `use_mcp: true`, o proxy injeta definições de ferramentas no system prompt e entra em um loop iterativo (máx. 6 iterações). O modelo sinaliza chamadas de ferramenta com tags XML na resposta:
+Quando `use_mcp: true`, o proxy injeta definições de ferramentas no system prompt e entra em um loop iterativo (máx. configurável em `config.mjs`). O modelo sinaliza chamadas de ferramenta com tags XML na resposta:
 
 ```xml
 <tool_call>
-<name>get_task</name>
-<args>{"task_id": 42}</args>
+<name>nome_da_ferramenta</name>
+<args>{"param": "valor"}</args>
 </tool_call>
 ```
 
-O proxy executa a ferramenta, devolve o resultado como mensagem do usuário e repete até que o modelo responda sem `<tool_call>`.
+O proxy executa a ferramenta, devolve o resultado como mensagem do usuário e repete até que o modelo responda sem `<tool_call>`. O mecanismo funciona de forma idêntica para todos os providers.
 
-### Ferramentas disponíveis
+### Ferramentas built-in
 
-| Ferramenta | Descrição | Parâmetros principais |
+As ferramentas disponíveis por padrão integram com a API backend configurada em `laravelApi`:
+
+| Ferramenta | Descrição | Parâmetros |
 | :--- | :--- | :--- |
-| `get_task` | Estado completo de uma task com suas subtasks | `task_id` |
-| `list_agents` | Lista agentes com slug, nome, role e status | — |
-| `reassign_subtask` | Muda o agente de uma subtask pendente | `subtask_id`, `agent_slug` |
+| `get_task` | Retorna estado completo de uma task com subtasks | `task_id` |
+| `list_agents` | Lista agentes disponíveis com slug, nome e status | — |
+| `reassign_subtask` | Reatribui uma subtask a outro agente | `subtask_id`, `agent_slug` |
 | `update_subtask_instructions` | Atualiza a descrição de uma subtask | `subtask_id`, `description` |
-| `add_subtask` | Cria nova subtask, opcionalmente bloqueada por dependência | `task_id`, `title`, `description`, `agent_slug`, `depends_on_subtask_id?` |
+| `add_subtask` | Cria nova subtask, opcionalmente com dependência | `task_id`, `title`, `description`, `agent_slug`, `depends_on_subtask_id?` |
 | `skip_subtask` | Marca subtask como concluída sem execução | `subtask_id`, `reason` |
-| `update_task_status` | Atualiza o status da task pai | `task_id`, `status` |
-| `ask_user` | Pausa execução e aguarda resposta do operador (timeout: 4h) | `subtask_id`, `question` |
-
-O loop MCP funciona de forma idêntica para todos os providers.
+| `update_task_status` | Atualiza o status de uma task | `task_id`, `status` |
+| `ask_user` | Pausa execução e aguarda resposta humana (timeout configurável) | `subtask_id`, `question` |
 
 ---
 
 ## Configuração
 
-**Porta:** `9090`
+Todas as opções ficam em `config.mjs`:
 
-**PATH consultado para binários:**
-
-```
-~/.nvm/versions/node/v24.15.0/bin
-~/.local/bin
-/usr/local/bin
-/usr/bin
-/bin
-```
-
-**API Laravel:** `http://localhost:8000/api` (usada pelas ferramentas MCP e pelo poll SSE)
-
-**Iniciar:**
-
-```bash
-node ai-proxy/server.mjs
-```
+| Chave | Padrão | Descrição |
+| :--- | :--- | :--- |
+| `port` | `9090` | Porta HTTP do proxy |
+| `laravelApi` | `http://localhost:8000/api` | URL base da API backend |
+| `path.nvmNode` | `~/.nvm/…/bin` | Diretório de binários do Node (nvm) |
+| `path.localBin` | `~/.local/bin` | Diretório de binários locais |
+| `timeouts.claude` | `180000` | Timeout de execução do Claude (ms) |
+| `timeouts.gemini` | `180000` | Timeout de execução do Gemini (ms) |
+| `timeouts.codex` | `240000` | Timeout de execução do Codex (ms) |
+| `mcp.maxIterations` | `6` | Máximo de iterações do loop MCP |
+| `mcp.askUser.pollMs` | `3000` | Intervalo de poll do `ask_user` (ms) |
+| `mcp.askUser.timeoutMs` | `14400000` | Timeout máximo do `ask_user` (ms) |
+| `ssePollMs` | `1000` | Intervalo de poll SSE (ms) |
