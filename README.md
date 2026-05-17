@@ -1,29 +1,102 @@
 # AI Proxy
 
-Serviço intermediário que unifica o acesso a múltiplos provedores de IA (Claude, Gemini, Codex) através de uma API REST. Suporta conversas multi-turn, execução de ferramentas via MCP e eventos em tempo real via SSE.
+Serviço intermediário que unifica o acesso a múltiplos provedores de IA (Claude, Gemini, Codex) através de uma API REST. Suporta conversas multi-turn, execução de ferramentas via MCP, fila de execução persistente e eventos em tempo real via SSE.
 
 ---
 
 ## Requisitos
 
-- Node.js 18+
+- **Node.js 22+** (utiliza `node:sqlite` nativo para persistência da fila)
 - CLIs dos providers desejados instaladas e disponíveis no PATH:
   - [Claude CLI](https://docs.anthropic.com/claude/docs/claude-cli)
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
   - [Codex CLI](https://github.com/openai/codex)
 
-## Instalação e uso
+---
+
+## Inicialização
+
+O AI Proxy é composto por dois processos independentes:
+
+| Processo | Porta | Descrição |
+| :--- | :--- | :--- |
+| **HTTP Server** | `9090` | Recebe requisições, roteamento, SSE |
+| **Queue Daemon** | `9091` | Executa prompts, controla concorrência, persiste jobs |
+
+**Iniciar ambos em background (recomendado):**
 
 ```bash
-npm start        # porta padrão 9090
-npm run dev      # com reload automático
+npm run start:all   # inicia server + queue desanexados do terminal
+npm run stop:all    # encerra ambos
 ```
 
-A porta e demais configurações podem ser ajustadas em `config.mjs`.
+Os processos ficam desanexados do terminal — sobrevivem ao fechar o shell. Logs gravados em:
+- `logs/server.log`
+- `logs/queue.log`
+
+**Iniciar individualmente (foreground):**
+
+```bash
+npm start           # só o HTTP server
+npm run queue       # só o daemon da fila
+npm run dev         # ambos com --watch (reload automático)
+```
 
 ---
 
-## Sumário de Endpoints
+## Arquitetura
+
+```
+HTTP Server (:9090)                Queue Daemon (:9091)
+┌─────────────────────────┐        ┌──────────────────────────────┐
+│  middleware              │        │  worker (semáforo + FIFO)    │
+│    cors / logger         │        │    max_concurrent: 3         │
+│    body-parser           │        │                              │
+│    error-handler         │  HTTP  │  store (SQLite)              │
+│                          │◄──────►│    jobs: pending/running/    │
+│  controllers             │        │          completed/failed    │
+│    run     → run.service │        │                              │
+│    events  → broadcaster │        │  providers                   │
+│    providers             │        │    claude / gemini / codex   │
+│    health                │        │                              │
+└─────────────────────────┘        │  MCP client (stdio)          │
+                                    │    carrega servidores MCP    │
+                                    └──────────────────────────────┘
+```
+
+**Fluxo de uma requisição:**
+```
+POST /run → run.controller → run.service
+  → queue/client: POST :9091/execute   (submete job, recebe job_id)
+  → queue/client: GET  :9091/result/:id (poll até completar)
+  ← { output, usage }
+← json 200
+```
+
+### Estrutura de arquivos
+
+```
+src/
+  utils/          env, spawn, path, prompt, parse, errors
+  providers/      claude, gemini, codex + index (wrapProvider)
+  mcp/            client (stdio), loop (XML tool-call)
+  sse/            broadcaster
+  http/
+    middleware/   cors, body-parser, logger, error-handler
+    controllers/  run, providers, events, health
+    router.mjs    roteamento
+    routes.mjs    registro de rotas
+  services/       run.service, providers.service
+  queue/
+    daemon.mjs    processo standalone (HTTP :9091)
+    worker.mjs    semáforo + execução de jobs
+    store.mjs     persistência SQLite
+    client.mjs    submit + poll (usado pelo run.service)
+```
+
+---
+
+## Sumário de Endpoints — HTTP Server (:9090)
 
 | Método | Rota | Descrição |
 | :--- | :--- | :--- |
@@ -38,14 +111,14 @@ A porta e demais configurações podem ser ajustadas em `config.mjs`.
 
 ### `POST /run`
 
-Envia um prompt a um provider e retorna a resposta gerada.
+Envia um prompt a um provider. A execução é enfileirada no daemon — a requisição HTTP fica aberta até o job completar.
 
 **Corpo da requisição**
 
 | Campo | Tipo | Obrigatório | Descrição |
 | :--- | :--- | :---: | :--- |
 | `provider` | string | | `claude` (padrão), `gemini` ou `codex` |
-| `model` | string | | Modelo específico do provider (ex: `claude-sonnet-4-6`) |
+| `model` | string | | Modelo específico (ex: `claude-sonnet-4-6`) |
 | `system_prompt` | string | | Instruções de sistema para o modelo |
 | `content` | string | ✓ | Mensagem atual do usuário |
 | `messages` | array | | Histórico da conversa — veja [Sessions](#sessions-conversas-multi-turn) |
@@ -87,7 +160,7 @@ curl -X POST http://localhost:9090/run \
 
 ### `GET /providers`
 
-Verifica quais CLIs de IA estão instaladas e disponíveis no PATH. Não spawna processos — consulta o PATH diretamente.
+Verifica quais CLIs estão instaladas no PATH. Não spawna processos.
 
 **Resposta — `200 OK`**
 
@@ -105,9 +178,7 @@ Verifica quais CLIs de IA estão instaladas e disponíveis no PATH. Não spawna 
 
 ### `GET /events`
 
-Stream SSE que emite `event: update` sempre que o estado do backend muda. O proxy consulta a URL configurada em `config.mjs` (`laravelApi`) a cada `ssePollMs` milissegundos.
-
-**Conectar:**
+Stream SSE. O proxy consulta a API backend a cada `ssePollMs` ms e emite `event: update` quando o estado muda.
 
 ```js
 const es = new EventSource('http://localhost:9090/events')
@@ -139,17 +210,57 @@ es.addEventListener('update', e => {
 
 | Status | Corpo | Quando ocorre |
 | :--- | :--- | :--- |
-| `400` | `{ "error": "Provider inválido: xyz" }` | Provider desconhecido ou `content` ausente |
-| `500` | `{ "error": "<mensagem de erro>" }` | Falha na execução do CLI |
-| `503` | `{ "error": "provider_unavailable", "provider": "gemini" }` | Binário do provider não encontrado no PATH |
+| `400` | `{ "error": "..." }` | Provider inválido, `content` ausente ou JSON malformado |
+| `500` | `{ "error": "..." }` | Falha inesperada na execução |
+| `503` | `{ "error": "provider_unavailable", "provider": "..." }` | Binário do provider não encontrado no PATH |
+| `503` | `{ "error": "queue_full" }` | Fila atingiu `maxQueueSize` |
+| `503` | `{ "error": "queue_timeout" }` | Job excedeu `jobTimeoutMs` aguardando na fila |
+| `503` | `{ "error": "queue_unavailable" }` | Daemon da fila não está rodando |
+
+---
+
+## Fila de Execução
+
+O daemon controla quantos prompts rodam simultaneamente e persiste os jobs em SQLite. Em caso de crash, jobs pendentes são re-enfileirados automaticamente no próximo startup.
+
+### API do Daemon (:9091)
+
+| Método | Rota | Descrição |
+| :--- | :--- | :--- |
+| `POST` | `/execute` | Submete job (idempotente por `job_id`) → `202` |
+| `GET` | `/result/:id` | Consulta resultado — `200` (done) ou `202` (aguardando) |
+| `GET` | `/status` | Jobs em execução, na fila e limite de concorrência |
+| `GET` | `/health` | Confirma que o daemon está vivo |
+
+### Estados de um job
+
+```
+pending → running → completed
+                 ↘ failed
+```
+
+Jobs interrompidos por crash voltam para `pending` automaticamente.
+
+### Ciclo de vida com crash recovery
+
+```
+1. Job submetido → status: pending (gravado em SQLite)
+2. Slot disponível → status: running
+3. Provider executa
+4. Concluído → status: completed + resultado gravado
+   Erro      → status: failed   + erro gravado
+
+Em caso de crash durante running:
+  próximo startup → todos running → pending → re-executados
+```
 
 ---
 
 ## Sessions (Conversas Multi-turn)
 
-O proxy é **stateless**: não armazena histórico entre requisições. O cliente é responsável por manter o histórico e enviá-lo completo a cada turno via `messages`.
+O proxy é **stateless**: não armazena histórico. O cliente mantém e envia o histórico completo a cada turno via `messages`.
 
-### Formato do histórico
+### Formato
 
 ```json
 "messages": [
@@ -159,11 +270,9 @@ O proxy é **stateless**: não armazena histórico entre requisições. O client
 ]
 ```
 
-Cada objeto tem `role` (`user` ou `assistant`) e `content` (string). O campo `content` da requisição é a **nova mensagem** — não deve ser incluída em `messages`.
+O campo `content` da requisição é a nova mensagem e **não** deve constar em `messages`.
 
 ### Como o prompt é montado
-
-Internamente, `buildPrompt()` serializa o contexto completo nesta ordem:
 
 ```
 [INSTRUÇÕES DO SISTEMA]
@@ -175,49 +284,22 @@ Usuário:
 
 Assistente:
 <messages[1].content>
-
 ...
 
 [NOVA MENSAGEM DO USUÁRIO]
 <content>
 ```
 
-**Exceção — Claude:** o `system_prompt` é entregue via flag `--system-prompt` separada do restante. O histórico + mensagem atual seguem via stdin. Gemini e Codex recebem tudo mesclado em um único bloco via stdin.
+**Claude** recebe `system_prompt` via flag `--system-prompt` separada; histórico + mensagem chegam via stdin.  
+**Gemini e Codex** recebem tudo mesclado em um único bloco via stdin.
 
-### Entrega via stdin
-
-O proxy usa `spawn` sem shell para todos os providers. O prompt é escrito diretamente no stdin do processo filho, sem passar por argumentos de linha de comando — eliminando limitações de tamanho (ARG_MAX) e problemas de escaping com conteúdo arbitrário.
-
-### Exemplo: conversa de dois turnos
-
-**Turno 1 — sem histórico:**
-
-```bash
-curl -X POST http://localhost:9090/run \
-     -d '{ "provider": "claude", "content": "My name is Alice." }'
-# → "Hello, Alice! How can I help you?"
-```
-
-**Turno 2 — com histórico:**
-
-```bash
-curl -X POST http://localhost:9090/run \
-     -d '{
-       "provider": "claude",
-       "messages": [
-         { "role": "user",      "content": "My name is Alice." },
-         { "role": "assistant", "content": "Hello, Alice! How can I help you?" }
-       ],
-       "content": "What is my name?"
-     }'
-# → "Your name is Alice."
-```
+Todos os providers usam `spawn` sem shell — sem limite de tamanho (ARG_MAX) e sem escaping.
 
 ---
 
 ## Loop de Ferramentas MCP
 
-Quando `use_mcp: true`, o proxy injeta definições de ferramentas no system prompt e entra em um loop iterativo (máx. configurável em `config.mjs`). O modelo sinaliza chamadas de ferramenta com tags XML na resposta:
+Quando `use_mcp: true`, o proxy injeta as definições das ferramentas no system prompt e entra em loop (máx. `mcp.maxIterations`). O modelo sinaliza chamadas com XML:
 
 ```xml
 <tool_call>
@@ -226,22 +308,23 @@ Quando `use_mcp: true`, o proxy injeta definições de ferramentas no system pro
 </tool_call>
 ```
 
-O proxy executa a ferramenta, devolve o resultado como mensagem do usuário e repete até que o modelo responda sem `<tool_call>`. O mecanismo funciona de forma idêntica para todos os providers.
+O proxy executa a ferramenta via MCP server externo, devolve o resultado e repete até o modelo responder sem `<tool_call>`.
 
-### Ferramentas built-in
+### Plugar um servidor MCP externo
 
-As ferramentas disponíveis por padrão integram com a API backend configurada em `laravelApi`:
+Servidores MCP são processos independentes que comunicam via stdio (JSON-RPC 2.0 + Content-Length framing). O proxy os descobre automaticamente via `tools/list` no startup.
 
-| Ferramenta | Descrição | Parâmetros |
-| :--- | :--- | :--- |
-| `get_task` | Retorna estado completo de uma task com subtasks | `task_id` |
-| `list_agents` | Lista agentes disponíveis com slug, nome e status | — |
-| `reassign_subtask` | Reatribui uma subtask a outro agente | `subtask_id`, `agent_slug` |
-| `update_subtask_instructions` | Atualiza a descrição de uma subtask | `subtask_id`, `description` |
-| `add_subtask` | Cria nova subtask, opcionalmente com dependência | `task_id`, `title`, `description`, `agent_slug`, `depends_on_subtask_id?` |
-| `skip_subtask` | Marca subtask como concluída sem execução | `subtask_id`, `reason` |
-| `update_task_status` | Atualiza o status de uma task | `task_id`, `status` |
-| `ask_user` | Pausa execução e aguarda resposta humana (timeout configurável) | `subtask_id`, `question` |
+**`config.mjs`:**
+
+```js
+mcp: {
+  servers: [
+    { name: 'meu-projeto', command: 'node', args: ['../meu-projeto/mcp-server.mjs'] }
+  ]
+}
+```
+
+O arquivo `mcp-server.mjs` na raiz do repositório é um **template** com a implementação do protocolo — copie-o para o seu projeto, defina as ferramentas em `TOOLS` e implemente os handlers em `callTool()`.
 
 ---
 
@@ -252,13 +335,18 @@ Todas as opções ficam em `config.mjs`:
 | Chave | Padrão | Descrição |
 | :--- | :--- | :--- |
 | `port` | `9090` | Porta HTTP do proxy |
-| `laravelApi` | `http://localhost:8000/api` | URL base da API backend |
+| `laravelApi` | `http://localhost:8000/api` | URL base da API backend (SSE + MCP) |
 | `path.nvmNode` | `~/.nvm/…/bin` | Diretório de binários do Node (nvm) |
 | `path.localBin` | `~/.local/bin` | Diretório de binários locais |
 | `timeouts.claude` | `180000` | Timeout de execução do Claude (ms) |
 | `timeouts.gemini` | `180000` | Timeout de execução do Gemini (ms) |
 | `timeouts.codex` | `240000` | Timeout de execução do Codex (ms) |
 | `mcp.maxIterations` | `6` | Máximo de iterações do loop MCP |
-| `mcp.askUser.pollMs` | `3000` | Intervalo de poll do `ask_user` (ms) |
-| `mcp.askUser.timeoutMs` | `14400000` | Timeout máximo do `ask_user` (ms) |
+| `mcp.servers` | `[]` | Servidores MCP externos a conectar no startup |
 | `ssePollMs` | `1000` | Intervalo de poll SSE (ms) |
+| `queue.port` | `9091` | Porta HTTP do daemon da fila |
+| `queue.maxConcurrent` | `3` | Máximo de prompts executando simultaneamente |
+| `queue.maxQueueSize` | `50` | Máximo de jobs aguardando (`0` = ilimitado) |
+| `queue.jobTimeoutMs` | `300000` | Timeout máximo de espera por job (ms) |
+| `queue.dbPath` | `./queue.db` | Caminho do arquivo SQLite da fila |
+| `queue.cleanupAfterMs` | `86400000` | Tempo para remover jobs concluídos (ms) |
