@@ -70,8 +70,9 @@ O AI Proxy é composto por dois processos independentes:
 **Iniciar ambos em background (recomendado):**
 
 ```bash
-npm run start:all   # inicia server + queue desanexados do terminal
-npm run stop:all    # encerra ambos
+npm run start:all    # inicia server + queue desanexados do terminal
+npm run stop:all     # encerra ambos
+npm run restart:all  # stop + start
 ```
 
 Logs gravados em `logs/server.log` e `logs/queue.log`.
@@ -135,10 +136,10 @@ src/
   webhook/              emitter.mjs
   http/
     middleware/         cors, body-parser, logger, error-handler
-    controllers/        run, providers, health
+    controllers/        run, providers, health, metrics
     router.mjs
     routes.mjs
-  services/             run.service, providers.service
+  services/             run.service, providers.service, metrics.service
   queue/
     daemon.mjs          processo standalone (HTTP :9091)
     worker.mjs          semáforo + execução + emissão de webhooks
@@ -155,6 +156,7 @@ src/
 | `POST` | `/run` | Executa um prompt em um provider de IA |
 | `GET` | `/providers` | Lista quais CLIs estão disponíveis no sistema |
 | `GET` | `/health` | Status do proxy e modelos sugeridos |
+| `GET` | `/metrics/usage` | Agrega usage de tokens dos jobs completados |
 
 ---
 
@@ -227,6 +229,67 @@ Verifica quais CLIs estão instaladas no PATH. Não spawna processos.
 
 ---
 
+### `GET /metrics/usage`
+
+Agrega usage de tokens de todos os jobs completados armazenados no SQLite. Suporta filtro por provider e intervalo de tempo.
+
+**Query params (todos opcionais)**
+
+| Parâmetro | Tipo | Descrição |
+| :--- | :--- | :--- |
+| `provider` | string | Filtra por provider (`claude`, `gemini`, `codex`) |
+| `from` | number | Timestamp Unix em ms — início do intervalo |
+| `to` | number | Timestamp Unix em ms — fim do intervalo |
+
+**Resposta — `200 OK`**
+
+```json
+{
+  "period": { "from": 0, "to": 1716000000000 },
+  "totals": {
+    "jobs": 42,
+    "input_tokens": 18500,
+    "output_tokens": 7200,
+    "total_tokens": 25700,
+    "cached_tokens": 0
+  },
+  "by_provider": {
+    "claude": {
+      "jobs": 30,
+      "input_tokens": 14000,
+      "output_tokens": 5500,
+      "total_tokens": 19500,
+      "cached_tokens": 0
+    },
+    "gemini": {
+      "jobs": 12,
+      "input_tokens": 4500,
+      "output_tokens": 1700,
+      "total_tokens": 6200,
+      "cached_tokens": 0
+    }
+  }
+}
+```
+
+**Exemplo**
+
+```bash
+# usage geral
+curl http://localhost:9090/metrics/usage
+
+# filtrado por provider e período
+curl "http://localhost:9090/metrics/usage?provider=claude&from=1716000000000&to=1716999999999"
+```
+
+**Erros**
+
+| Status | Corpo | Quando |
+| :--- | :--- | :--- |
+| `503` | `{ "error": "queue_unavailable" }` | Daemon da fila não está rodando |
+
+---
+
 ### `GET /health`
 
 ```json
@@ -268,6 +331,7 @@ O daemon controla quantos prompts rodam simultaneamente e persiste os jobs em SQ
 | `POST` | `/execute` | Submete job (idempotente por `job_id`) → `202` |
 | `GET` | `/result/:id` | Consulta resultado — `200` (done) ou `202` (aguardando) |
 | `GET` | `/status` | Jobs em execução, na fila e limite de concorrência |
+| `GET` | `/metrics/usage` | Agrega tokens dos jobs completados (mesmos filtros do proxy) |
 | `GET` | `/health` | Confirma que o daemon está vivo |
 
 ### Ciclo de vida de um job
