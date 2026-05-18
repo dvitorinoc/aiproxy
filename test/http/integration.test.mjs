@@ -36,7 +36,7 @@ mock.module('../../src/providers/index.mjs', {
 })
 
 mock.module('../../config.mjs', {
-  exports: { default: { port: 0 } },
+  exports: { default: { port: 0, queue: { port: 0 } } },
 })
 
 // ─── Server setup ─────────────────────────────────────────────────

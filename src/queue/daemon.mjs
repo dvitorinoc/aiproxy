@@ -64,6 +64,15 @@ const server = createServer(async (req, res) => {
     })
   }
 
+  // ── GET /metrics/usage ──────────────────────────────────────────
+  if (req.method === 'GET' && req.url.startsWith('/metrics/usage')) {
+    const qs       = new URL(req.url, 'http://localhost').searchParams
+    const provider = qs.get('provider') || null
+    const from     = qs.has('from') ? parseInt(qs.get('from')) : 0
+    const to       = qs.has('to')   ? parseInt(qs.get('to'))   : Date.now()
+    return json(res, 200, store.getUsageMetrics({ provider, from, to }))
+  }
+
   // ── GET /health ──────────────────────────────────────────────────
   if (req.method === 'GET' && req.url === '/health') {
     return json(res, 200, { ok: true })
