@@ -1,6 +1,7 @@
 import { PROVIDERS }     from '../providers/index.mjs'
 import { loadMcpServers } from '../mcp/client.mjs'
 import * as store         from './store.mjs'
+import { emit }           from '../webhook/emitter.mjs'
 import config             from '../../config.mjs'
 
 let running = 0
@@ -33,18 +34,21 @@ export function getQueued()  { return waiters.length }
 async function runJob(id, payload) {
   const { provider, model, system_prompt, messages, content, use_mcp, cwd } = payload
   store.markRunning(id)
+  await emit('job.started', { job_id: id, provider })
   try {
     if (!PROVIDERS[provider]) throw new Error(`Provider inválido: ${provider}`)
     const result = await PROVIDERS[provider].call(
       system_prompt, messages, content, model || null, use_mcp, cwd
     )
     store.markCompleted(id, result)
+    await emit('job.completed', { job_id: id, provider, output: result.output, usage: result.usage })
   } catch (err) {
     const isUnavailable = err.code === 'ENOENT' || /exit 127|not found|No such file/i.test(err.message)
-    store.markFailed(id, isUnavailable
+    const error = isUnavailable
       ? { code: 'provider_unavailable', provider }
       : { code: 'execution_error', message: err.message }
-    )
+    store.markFailed(id, error)
+    await emit('job.failed', { job_id: id, provider, error })
   }
 }
 

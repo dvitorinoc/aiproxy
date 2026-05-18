@@ -4,9 +4,6 @@ export default {
   // Porta HTTP do proxy
   port: 9090,
 
-  // URL base da API Laravel (usada pelas ferramentas MCP e pelo poll SSE)
-  laravelApi: 'http://localhost:8000/api',
-
   // Diretórios adicionados ao PATH ao invocar CLIs de IA
   path: {
     nvmNode:  '/home/douglas/.nvm/versions/node/v24.15.0/bin',
@@ -31,8 +28,12 @@ export default {
     servers: [],
   },
 
-  // SSE: intervalo de poll da API Laravel para broadcast ao frontend (ms)
-  ssePollMs: 1_000,
+  // Webhook: notifica a aplicação consumidora sobre eventos da fila
+  // Eventos emitidos: job.started | job.completed | job.failed
+  webhook: {
+    url:    null,   // POST para esta URL em cada evento (null = desabilitado)
+    secret: null,   // HMAC-SHA256 secret — inclui X-Webhook-Signature no header
+  },
 
   // Fila de execução (daemon separado)
   queue: {
@@ -40,6 +41,7 @@ export default {
     maxConcurrent:  3,
     maxQueueSize:   50,           // 0 = ilimitado
     jobTimeoutMs:   300_000,
+    pollMs:         1_000,
     dbPath:         './queue.db',
     cleanupAfterMs: 24 * 60 * 60 * 1_000,
   },
