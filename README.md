@@ -1,6 +1,6 @@
 # AI Proxy
 
-Serviço intermediário que unifica o acesso a múltiplos provedores de IA (Claude, Gemini, Codex) através de uma API REST. Suporta conversas multi-turn, execução de ferramentas via MCP, fila de execução persistente e eventos em tempo real via SSE.
+Serviço intermediário que unifica o acesso a múltiplos provedores de IA (Claude, Gemini, Codex) através de uma API REST. Suporta conversas multi-turn, execução de ferramentas via MCP, fila de execução persistente e notificações via webhook.
 
 ---
 
@@ -14,13 +14,57 @@ Serviço intermediário que unifica o acesso a múltiplos provedores de IA (Clau
 
 ---
 
+## Configuração
+
+### 1. Variáveis de ambiente
+
+Copie `.env.example` para `.env` e ajuste para o seu ambiente:
+
+```bash
+cp .env.example .env
+```
+
+As variáveis essenciais são os caminhos de binários do Node no seu sistema:
+
+```env
+AI_PROXY_NVM_NODE=/home/<user>/.nvm/versions/node/<version>/bin
+AI_PROXY_LOCAL_BIN=/home/<user>/.local/bin
+```
+
+Todas as demais variáveis têm valores padrão e são opcionais. Consulte `.env.example` para a lista completa.
+
+### 2. Servidores MCP (opcional)
+
+Copie `mcp-servers.json.example` para `mcp-servers.json` e declare os servidores MCP que o proxy deve carregar no startup:
+
+```bash
+cp mcp-servers.json.example mcp-servers.json
+```
+
+```json
+[
+  {
+    "name": "meu-projeto",
+    "command": "node",
+    "args": ["../meu-projeto/mcp/server.mjs"],
+    "env": {
+      "MY_API_URL": "http://localhost:8000/api"
+    }
+  }
+]
+```
+
+Se o arquivo não existir, o proxy inicia normalmente sem servidores MCP.
+
+---
+
 ## Inicialização
 
 O AI Proxy é composto por dois processos independentes:
 
 | Processo | Porta | Descrição |
 | :--- | :--- | :--- |
-| **HTTP Server** | `9090` | Recebe requisições, roteamento, SSE |
+| **HTTP Server** | `9090` | Recebe requisições e roteamento |
 | **Queue Daemon** | `9091` | Executa prompts, controla concorrência, persiste jobs |
 
 **Iniciar ambos em background (recomendado):**
@@ -30,9 +74,7 @@ npm run start:all   # inicia server + queue desanexados do terminal
 npm run stop:all    # encerra ambos
 ```
 
-Os processos ficam desanexados do terminal — sobrevivem ao fechar o shell. Logs gravados em:
-- `logs/server.log`
-- `logs/queue.log`
+Logs gravados em `logs/server.log` e `logs/queue.log`.
 
 **Iniciar individualmente (foreground):**
 
@@ -51,23 +93,25 @@ HTTP Server (:9090)                Queue Daemon (:9091)
 ┌─────────────────────────┐        ┌──────────────────────────────┐
 │  middleware              │        │  worker (semáforo + FIFO)    │
 │    cors / logger         │        │    max_concurrent: 3         │
-│    body-parser           │        │                              │
-│    error-handler         │  HTTP  │  store (SQLite)              │
-│                          │◄──────►│    jobs: pending/running/    │
-│  controllers             │        │          completed/failed    │
-│    run     → run.service │        │                              │
-│    events  → broadcaster │        │  providers                   │
-│    providers             │        │    claude / gemini / codex   │
-│    health                │        │                              │
-└─────────────────────────┘        │  MCP client (stdio)          │
-                                    │    carrega servidores MCP    │
-                                    └──────────────────────────────┘
+│    body-parser           │  HTTP  │                              │
+│    error-handler         │◄──────►│  store (SQLite)              │
+│                          │        │    pending/running/          │
+│  controllers             │        │    completed/failed          │
+│    run  → run.service    │        │                              │
+│    providers             │        │  providers                   │
+│    health                │        │    claude / gemini / codex   │
+└─────────────────────────┘        │                              │
+                                    │  MCP client (stdio)          │
+           Webhook                  │    carrega mcp-servers.json  │
+           job.started  ───────────►│                              │
+           job.completed            └──────────────────────────────┘
+           job.failed
 ```
 
 **Fluxo de uma requisição:**
 ```
 POST /run → run.controller → run.service
-  → queue/client: POST :9091/execute   (submete job, recebe job_id)
+  → queue/client: POST :9091/execute    (submete job)
   → queue/client: GET  :9091/result/:id (poll até completar)
   ← { output, usage }
 ← json 200
@@ -76,22 +120,30 @@ POST /run → run.controller → run.service
 ### Estrutura de arquivos
 
 ```
+.env                    ← variáveis de ambiente (ignorado pelo git)
+.env.example            ← template
+mcp-servers.json        ← servidores MCP a carregar (ignorado pelo git)
+mcp-servers.json.example ← template
+config.mjs              ← lê process.env e mcp-servers.json
+scripts/
+  start.sh              ← inicia ambos os processos em background
+  stop.sh               ← encerra pelo .pids
 src/
-  utils/          env, spawn, path, prompt, parse, errors
-  providers/      claude, gemini, codex + index (wrapProvider)
-  mcp/            client (stdio), loop (XML tool-call)
-  sse/            broadcaster
+  utils/                env, spawn, path, prompt, parse, errors
+  providers/            claude, gemini, codex + index (wrapProvider)
+  mcp/                  client (stdio), loop (XML tool-call)
+  webhook/              emitter.mjs
   http/
-    middleware/   cors, body-parser, logger, error-handler
-    controllers/  run, providers, events, health
-    router.mjs    roteamento
-    routes.mjs    registro de rotas
-  services/       run.service, providers.service
+    middleware/         cors, body-parser, logger, error-handler
+    controllers/        run, providers, health
+    router.mjs
+    routes.mjs
+  services/             run.service, providers.service
   queue/
-    daemon.mjs    processo standalone (HTTP :9091)
-    worker.mjs    semáforo + execução de jobs
-    store.mjs     persistência SQLite
-    client.mjs    submit + poll (usado pelo run.service)
+    daemon.mjs          processo standalone (HTTP :9091)
+    worker.mjs          semáforo + execução + emissão de webhooks
+    store.mjs           persistência SQLite
+    client.mjs          submit + poll
 ```
 
 ---
@@ -102,7 +154,6 @@ src/
 | :--- | :--- | :--- |
 | `POST` | `/run` | Executa um prompt em um provider de IA |
 | `GET` | `/providers` | Lista quais CLIs estão disponíveis no sistema |
-| `GET` | `/events` | Stream SSE de eventos em tempo real |
 | `GET` | `/health` | Status do proxy e modelos sugeridos |
 
 ---
@@ -176,19 +227,6 @@ Verifica quais CLIs estão instaladas no PATH. Não spawna processos.
 
 ---
 
-### `GET /events`
-
-Stream SSE. O proxy consulta a API backend a cada `ssePollMs` ms e emite `event: update` quando o estado muda.
-
-```js
-const es = new EventSource('http://localhost:9090/events')
-es.addEventListener('update', e => {
-  const data = JSON.parse(e.data)
-})
-```
-
----
-
 ### `GET /health`
 
 ```json
@@ -213,8 +251,8 @@ es.addEventListener('update', e => {
 | `400` | `{ "error": "..." }` | Provider inválido, `content` ausente ou JSON malformado |
 | `500` | `{ "error": "..." }` | Falha inesperada na execução |
 | `503` | `{ "error": "provider_unavailable", "provider": "..." }` | Binário do provider não encontrado no PATH |
-| `503` | `{ "error": "queue_full" }` | Fila atingiu `maxQueueSize` |
-| `503` | `{ "error": "queue_timeout" }` | Job excedeu `jobTimeoutMs` aguardando na fila |
+| `503` | `{ "error": "queue_full" }` | Fila atingiu `AI_PROXY_QUEUE_MAX_SIZE` |
+| `503` | `{ "error": "queue_timeout" }` | Job excedeu `AI_PROXY_QUEUE_JOB_TIMEOUT` |
 | `503` | `{ "error": "queue_unavailable" }` | Daemon da fila não está rodando |
 
 ---
@@ -232,26 +270,48 @@ O daemon controla quantos prompts rodam simultaneamente e persiste os jobs em SQ
 | `GET` | `/status` | Jobs em execução, na fila e limite de concorrência |
 | `GET` | `/health` | Confirma que o daemon está vivo |
 
-### Estados de um job
+### Ciclo de vida de um job
 
 ```
 pending → running → completed
                  ↘ failed
 ```
 
-Jobs interrompidos por crash voltam para `pending` automaticamente.
+Jobs com status `running` interrompidos por crash são resetados para `pending` automaticamente.
 
-### Ciclo de vida com crash recovery
+---
+
+## Webhook
+
+O proxy emite eventos HTTP para a URL configurada em `AI_PROXY_WEBHOOK_URL` a cada transição de estado de job. A aplicação consumidora recebe os eventos e decide o que fazer (atualizar frontend, persistir, disparar ações).
+
+### Eventos
+
+| Evento | Quando |
+| :--- | :--- |
+| `job.started` | Job entra em execução |
+| `job.completed` | Job concluído com sucesso |
+| `job.failed` | Job falhou (provider indisponível, erro de execução, fila cheia) |
+
+### Formato do payload
+
+```json
+{
+  "event": "job.completed",
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "provider": "claude",
+  "output": "Resposta do modelo...",
+  "usage": { "input_tokens": 100, "output_tokens": 50 },
+  "timestamp": 1716000000000
+}
+```
+
+### Assinatura HMAC (opcional)
+
+Quando `AI_PROXY_WEBHOOK_SECRET` está configurado, cada requisição inclui o header:
 
 ```
-1. Job submetido → status: pending (gravado em SQLite)
-2. Slot disponível → status: running
-3. Provider executa
-4. Concluído → status: completed + resultado gravado
-   Erro      → status: failed   + erro gravado
-
-Em caso de crash durante running:
-  próximo startup → todos running → pending → re-executados
+X-Webhook-Signature: sha256=<hmac-sha256 do body>
 ```
 
 ---
@@ -299,7 +359,7 @@ Todos os providers usam `spawn` sem shell — sem limite de tamanho (ARG_MAX) e 
 
 ## Loop de Ferramentas MCP
 
-Quando `use_mcp: true`, o proxy injeta as definições das ferramentas no system prompt e entra em loop (máx. `mcp.maxIterations`). O modelo sinaliza chamadas com XML:
+Quando `use_mcp: true`, o proxy injeta as definições das ferramentas no system prompt e entra em loop (máx. `AI_PROXY_MCP_MAX_ITERATIONS`). O modelo sinaliza chamadas com XML:
 
 ```xml
 <tool_call>
@@ -308,45 +368,50 @@ Quando `use_mcp: true`, o proxy injeta as definições das ferramentas no system
 </tool_call>
 ```
 
-O proxy executa a ferramenta via MCP server externo, devolve o resultado e repete até o modelo responder sem `<tool_call>`.
+O proxy executa a ferramenta via servidor MCP externo, devolve o resultado e repete até o modelo responder sem `<tool_call>`.
 
 ### Plugar um servidor MCP externo
 
-Servidores MCP são processos independentes que comunicam via stdio (JSON-RPC 2.0 + Content-Length framing). O proxy os descobre automaticamente via `tools/list` no startup.
+Servidores MCP são processos independentes que comunicam via stdio (JSON-RPC 2.0 + Content-Length framing). O proxy os descobre via `tools/list` no startup e roteia `tool_calls` automaticamente.
 
-**`config.mjs`:**
+Configure em `mcp-servers.json`:
 
-```js
-mcp: {
-  servers: [
-    { name: 'meu-projeto', command: 'node', args: ['../meu-projeto/mcp-server.mjs'] }
-  ]
-}
+```json
+[
+  {
+    "name": "meu-projeto",
+    "command": "node",
+    "args": ["../meu-projeto/mcp/server.mjs"],
+    "env": { "MY_API_URL": "http://localhost:8000/api" }
+  }
+]
 ```
 
-O arquivo `mcp-server.mjs` na raiz do repositório é um **template** com a implementação do protocolo — copie-o para o seu projeto, defina as ferramentas em `TOOLS` e implemente os handlers em `callTool()`.
+O arquivo `mcp-server.mjs` na raiz é um **template** — copie para o seu projeto, defina as ferramentas em `TOOLS` e implemente os handlers em `callTool()`.
 
 ---
 
-## Configuração
+## Referência de Configuração
 
-Todas as opções ficam em `config.mjs`:
+Todas as opções são definidas via variáveis de ambiente (`.env`):
 
-| Chave | Padrão | Descrição |
+| Variável | Padrão | Descrição |
 | :--- | :--- | :--- |
-| `port` | `9090` | Porta HTTP do proxy |
-| `laravelApi` | `http://localhost:8000/api` | URL base da API backend (SSE + MCP) |
-| `path.nvmNode` | `~/.nvm/…/bin` | Diretório de binários do Node (nvm) |
-| `path.localBin` | `~/.local/bin` | Diretório de binários locais |
-| `timeouts.claude` | `180000` | Timeout de execução do Claude (ms) |
-| `timeouts.gemini` | `180000` | Timeout de execução do Gemini (ms) |
-| `timeouts.codex` | `240000` | Timeout de execução do Codex (ms) |
-| `mcp.maxIterations` | `6` | Máximo de iterações do loop MCP |
-| `mcp.servers` | `[]` | Servidores MCP externos a conectar no startup |
-| `ssePollMs` | `1000` | Intervalo de poll SSE (ms) |
-| `queue.port` | `9091` | Porta HTTP do daemon da fila |
-| `queue.maxConcurrent` | `3` | Máximo de prompts executando simultaneamente |
-| `queue.maxQueueSize` | `50` | Máximo de jobs aguardando (`0` = ilimitado) |
-| `queue.jobTimeoutMs` | `300000` | Timeout máximo de espera por job (ms) |
-| `queue.dbPath` | `./queue.db` | Caminho do arquivo SQLite da fila |
-| `queue.cleanupAfterMs` | `86400000` | Tempo para remover jobs concluídos (ms) |
+| `AI_PROXY_PORT` | `9090` | Porta HTTP do proxy |
+| `AI_PROXY_NVM_NODE` | `''` | Diretório de binários do Node (nvm) |
+| `AI_PROXY_LOCAL_BIN` | `''` | Diretório de binários locais |
+| `AI_PROXY_TIMEOUT_CLAUDE` | `180000` | Timeout de execução do Claude (ms) |
+| `AI_PROXY_TIMEOUT_GEMINI` | `180000` | Timeout de execução do Gemini (ms) |
+| `AI_PROXY_TIMEOUT_CODEX` | `240000` | Timeout de execução do Codex (ms) |
+| `AI_PROXY_MCP_MAX_ITERATIONS` | `6` | Máximo de iterações do loop MCP |
+| `AI_PROXY_WEBHOOK_URL` | `''` | URL para receber eventos da fila (vazio = desabilitado) |
+| `AI_PROXY_WEBHOOK_SECRET` | `''` | Secret HMAC-SHA256 para assinar webhooks |
+| `AI_PROXY_QUEUE_PORT` | `9091` | Porta HTTP do daemon da fila |
+| `AI_PROXY_QUEUE_MAX_CONCURRENT` | `3` | Máximo de prompts executando simultaneamente |
+| `AI_PROXY_QUEUE_MAX_SIZE` | `50` | Máximo de jobs aguardando (`0` = ilimitado) |
+| `AI_PROXY_QUEUE_JOB_TIMEOUT` | `300000` | Timeout máximo de espera por job (ms) |
+| `AI_PROXY_QUEUE_POLL_MS` | `1000` | Intervalo de poll do client para o daemon (ms) |
+| `AI_PROXY_QUEUE_DB_PATH` | `./queue.db` | Caminho do arquivo SQLite da fila |
+| `AI_PROXY_QUEUE_CLEANUP_AFTER` | `86400000` | Tempo para remover jobs concluídos (ms) |
+
+Servidores MCP são configurados em `mcp-servers.json` (ver `.env.example` e `mcp-servers.json.example`).
