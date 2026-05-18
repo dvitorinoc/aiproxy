@@ -36,6 +36,11 @@ export default {
     secret: process.env.AI_PROXY_WEBHOOK_SECRET || null,
   },
 
+  context: {
+    maxChars:    +process.env.AI_PROXY_CONTEXT_MAX_CHARS    || 0,
+    maxMessages: +process.env.AI_PROXY_CONTEXT_MAX_MESSAGES || 0,
+  },
+
   queue: {
     port:           +process.env.AI_PROXY_QUEUE_PORT           || 9091,
     maxConcurrent:  +process.env.AI_PROXY_QUEUE_MAX_CONCURRENT || 3,

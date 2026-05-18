@@ -52,3 +52,7 @@ Thumbs.db
 *.db
 .env
 mcp-servers.json
+
+# Benchmark results — only baseline is committed
+test/benchmarks/results/*.json
+!test/benchmarks/results/baseline.json

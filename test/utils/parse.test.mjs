@@ -20,6 +20,7 @@ describe('emptyUsage', () => {
     assert.equal(u.total_tokens, null)
     assert.equal(u.reasoning_tokens, null)
     assert.equal(u.cached_tokens, null)
+    assert.equal(u.cache_creation_tokens, null)
   })
   it('request_count defaults to 1', () => {
     assert.equal(emptyUsage().request_count, 1)
@@ -62,6 +63,16 @@ describe('mergeUsage', () => {
     const a = { ...emptyUsage(), raw: { from: 'base' } }
     const b = { ...emptyUsage(), raw: null }
     assert.deepEqual(mergeUsage(a, b).raw, { from: 'base' })
+  })
+  it('sums cache_creation_tokens', () => {
+    const a = { ...emptyUsage(), cache_creation_tokens: 400 }
+    const b = { ...emptyUsage(), cache_creation_tokens: 600 }
+    assert.equal(mergeUsage(a, b).cache_creation_tokens, 1000)
+  })
+  it('cache_creation_tokens: null + number = number', () => {
+    const a = { ...emptyUsage(), cache_creation_tokens: null }
+    const b = { ...emptyUsage(), cache_creation_tokens: 300 }
+    assert.equal(mergeUsage(a, b).cache_creation_tokens, 300)
   })
 })
 
@@ -154,6 +165,16 @@ describe('extractUsage', () => {
   it('maps cached_tokens from cache_read_input_tokens', () => {
     const u = extractUsage({ input_tokens: 1, cache_read_input_tokens: 99 })
     assert.equal(u.cached_tokens, 99)
+  })
+
+  it('extracts cache_creation_tokens from cache_creation_input_tokens', () => {
+    const u = extractUsage({ input_tokens: 3, cache_creation_input_tokens: 1200 })
+    assert.equal(u.cache_creation_tokens, 1200)
+  })
+
+  it('cached_tokens does not use cache_creation_input_tokens as fallback', () => {
+    const u = extractUsage({ input_tokens: 3, cache_creation_input_tokens: 1200 })
+    assert.equal(u.cached_tokens, null)
   })
 
   it('finds usage nested inside usage key', () => {

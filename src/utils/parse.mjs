@@ -1,5 +1,5 @@
 export function emptyUsage(source = 'unavailable') {
-  return { source, input_tokens: null, output_tokens: null, total_tokens: null, reasoning_tokens: null, cached_tokens: null, request_count: 1, raw: null }
+  return { source, input_tokens: null, output_tokens: null, total_tokens: null, reasoning_tokens: null, cached_tokens: null, cache_creation_tokens: null, request_count: 1, raw: null }
 }
 
 export function mergeUsage(base = emptyUsage(), next = emptyUsage()) {
@@ -10,8 +10,9 @@ export function mergeUsage(base = emptyUsage(), next = emptyUsage()) {
     output_tokens:    add(base.output_tokens,    next.output_tokens),
     total_tokens:     add(base.total_tokens,     next.total_tokens),
     reasoning_tokens: add(base.reasoning_tokens, next.reasoning_tokens),
-    cached_tokens:    add(base.cached_tokens,    next.cached_tokens),
-    request_count:    (base.request_count || 0) + (next.request_count || 0),
+    cached_tokens:         add(base.cached_tokens,         next.cached_tokens),
+    cache_creation_tokens: add(base.cache_creation_tokens, next.cache_creation_tokens),
+    request_count:         (base.request_count || 0) + (next.request_count || 0),
     raw:              next.raw ?? base.raw ?? null,
   }
 }
@@ -44,8 +45,9 @@ export function extractUsage(value) {
       input_tokens:     pickFirstNumber(node.input_tokens,     node.prompt_tokens,     node.promptTokenCount,  node.inputTokenCount,  node.prompt_token_count),
       output_tokens:    pickFirstNumber(node.output_tokens,    node.completion_tokens, node.candidatesTokenCount, node.outputTokenCount, node.completion_token_count),
       total_tokens:     pickFirstNumber(node.total_tokens,     node.totalTokenCount,   node.total_token_count),
-      reasoning_tokens: pickFirstNumber(node.reasoning_tokens, node.thoughtsTokenCount, node.reasoningTokenCount),
-      cached_tokens:    pickFirstNumber(node.cached_tokens,    node.cachedTokenCount,  node.cachedContentTokenCount, node.cache_read_input_tokens, node.cache_creation_input_tokens),
+      reasoning_tokens:     pickFirstNumber(node.reasoning_tokens,     node.thoughtsTokenCount,   node.reasoningTokenCount),
+      cached_tokens:        pickFirstNumber(node.cached_tokens,        node.cachedTokenCount,     node.cachedContentTokenCount, node.cache_read_input_tokens),
+      cache_creation_tokens: pickFirstNumber(node.cache_creation_tokens, node.cache_creation_input_tokens),
     }
 
     if (Object.values(direct).some(v => v != null)) {
