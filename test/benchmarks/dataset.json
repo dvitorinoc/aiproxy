@@ -1,0 +1,320 @@
+{
+  "version": "1.1.0",
+  "created_at": "2026-05-18",
+  "cases": [
+    {
+      "id": "A01",
+      "category": "simple",
+      "description": "Pergunta factual JS — typeof null",
+      "tags": ["factual", "deterministic"],
+      "critical": false,
+      "request": {
+        "provider": null,
+        "model": null,
+        "system_prompt": "Answer in one line.",
+        "content": "What is the output of: console.log(typeof null)?",
+        "messages": [],
+        "use_mcp": false,
+        "cwd": null
+      },
+      "evaluation": {
+        "type": "exact_match",
+        "expected_contains": ["object"],
+        "criteria": ""
+      }
+    },
+    {
+      "id": "A02",
+      "category": "simple",
+      "description": "Cálculo aritmético simples",
+      "tags": ["factual", "deterministic"],
+      "critical": false,
+      "request": {
+        "provider": null,
+        "model": null,
+        "system_prompt": "Answer with only the number.",
+        "content": "What is 144 divided by 12?",
+        "messages": [],
+        "use_mcp": false,
+        "cwd": null
+      },
+      "evaluation": {
+        "type": "exact_match",
+        "expected_contains": ["12"],
+        "criteria": ""
+      }
+    },
+    {
+      "id": "C01",
+      "category": "history",
+      "description": "Histórico curto (2 pares), pergunta independente do contexto",
+      "tags": ["history", "deterministic"],
+      "critical": false,
+      "request": {
+        "provider": null,
+        "model": null,
+        "system_prompt": "Answer in one line.",
+        "content": "How do I install a package with npm?",
+        "messages": [
+          { "role": "user",      "content": "What is Node.js?" },
+          { "role": "assistant", "content": "Node.js is a JavaScript runtime built on Chrome's V8 engine." },
+          { "role": "user",      "content": "What is npm?" },
+          { "role": "assistant", "content": "npm is the package manager for Node.js, used to install and manage dependencies." }
+        ],
+        "use_mcp": false,
+        "cwd": null
+      },
+      "evaluation": {
+        "type": "exact_match",
+        "expected_contains": ["npm install"],
+        "criteria": ""
+      }
+    },
+    {
+      "id": "C02",
+      "category": "history",
+      "description": "Histórico médio (5 pares), resposta depende de turno recente",
+      "tags": ["history", "context-dependent"],
+      "critical": false,
+      "request": {
+        "provider": null,
+        "model": null,
+        "system_prompt": "You are a helpful assistant. Be concise.",
+        "content": "What was the name of the variable I asked you to rename?",
+        "messages": [
+          { "role": "user",      "content": "I'm refactoring a Node.js project." },
+          { "role": "assistant", "content": "Sure, I can help with that." },
+          { "role": "user",      "content": "The project uses Express for routing." },
+          { "role": "assistant", "content": "Got it. Express is a common choice for Node.js web apps." },
+          { "role": "user",      "content": "I have a function called getUserData." },
+          { "role": "assistant", "content": "I see it. What would you like to do with it?" },
+          { "role": "user",      "content": "Let's rename the variable 'res' inside it to 'response'." },
+          { "role": "assistant", "content": "Renamed. The variable 'res' is now 'response' inside getUserData." },
+          { "role": "user",      "content": "Good. Now let's move to the next function." },
+          { "role": "assistant", "content": "Ready. What's the next function?" }
+        ],
+        "use_mcp": false,
+        "cwd": null
+      },
+      "evaluation": {
+        "type": "llm_judge",
+        "expected_contains": [],
+        "criteria": "Does the response mention 'res' as the original name of the variable that was renamed?"
+      }
+    },
+    {
+      "id": "C03",
+      "category": "history",
+      "description": "Histórico longo (10 pares), dado crítico no primeiro turno",
+      "tags": ["history", "context-dependent", "long"],
+      "critical": true,
+      "request": {
+        "provider": null,
+        "model": null,
+        "system_prompt": "You are a helpful assistant. Be concise.",
+        "content": "What was the secret code I gave you at the beginning of our conversation?",
+        "messages": [
+          { "role": "user",      "content": "My secret code is ALPHA-7734. Remember it." },
+          { "role": "assistant", "content": "Got it. I'll remember ALPHA-7734." },
+          { "role": "user",      "content": "What is a JavaScript closure?" },
+          { "role": "assistant", "content": "A closure is a function that retains access to its outer scope even after the outer function has returned." },
+          { "role": "user",      "content": "Can you show a simple example?" },
+          { "role": "assistant", "content": "Sure: function counter() { let n = 0; return () => ++n; }" },
+          { "role": "user",      "content": "What is the difference between let and var?" },
+          { "role": "assistant", "content": "let is block-scoped, var is function-scoped. let was introduced in ES6." },
+          { "role": "user",      "content": "What is hoisting?" },
+          { "role": "assistant", "content": "Hoisting is JavaScript's behavior of moving declarations to the top of their scope before code executes." },
+          { "role": "user",      "content": "What is the event loop?" },
+          { "role": "assistant", "content": "The event loop is a mechanism that allows Node.js to perform non-blocking I/O by offloading operations to the system kernel." },
+          { "role": "user",      "content": "What is a Promise?" },
+          { "role": "assistant", "content": "A Promise is an object representing the eventual completion or failure of an asynchronous operation." },
+          { "role": "user",      "content": "What is async/await?" },
+          { "role": "assistant", "content": "async/await is syntactic sugar over Promises that makes asynchronous code look synchronous." },
+          { "role": "user",      "content": "What is a generator function?" },
+          { "role": "assistant", "content": "A generator function uses function* syntax and can pause execution with yield, resuming later." },
+          { "role": "user",      "content": "What is a WeakMap?" },
+          { "role": "assistant", "content": "A WeakMap holds key-value pairs where keys must be objects and are weakly referenced — they can be garbage collected." }
+        ],
+        "use_mcp": false,
+        "cwd": null
+      },
+      "evaluation": {
+        "type": "llm_judge",
+        "expected_contains": [],
+        "criteria": "Does the response mention 'ALPHA-7734' as the secret code?"
+      }
+    },
+    {
+      "id": "C04",
+      "category": "history",
+      "description": "Histórico longo (10 pares), pergunta independente do contexto",
+      "tags": ["history", "deterministic", "long"],
+      "critical": false,
+      "request": {
+        "provider": null,
+        "model": null,
+        "system_prompt": "Answer in one line.",
+        "content": "What does the Array.prototype.reduce method do in JavaScript?",
+        "messages": [
+          { "role": "user",      "content": "My secret code is ALPHA-7734. Remember it." },
+          { "role": "assistant", "content": "Got it. I'll remember ALPHA-7734." },
+          { "role": "user",      "content": "What is a JavaScript closure?" },
+          { "role": "assistant", "content": "A closure is a function that retains access to its outer scope even after the outer function has returned." },
+          { "role": "user",      "content": "Can you show a simple example?" },
+          { "role": "assistant", "content": "Sure: function counter() { let n = 0; return () => ++n; }" },
+          { "role": "user",      "content": "What is the difference between let and var?" },
+          { "role": "assistant", "content": "let is block-scoped, var is function-scoped. let was introduced in ES6." },
+          { "role": "user",      "content": "What is hoisting?" },
+          { "role": "assistant", "content": "Hoisting is JavaScript's behavior of moving declarations to the top of their scope before code executes." },
+          { "role": "user",      "content": "What is the event loop?" },
+          { "role": "assistant", "content": "The event loop is a mechanism that allows Node.js to perform non-blocking I/O by offloading operations to the system kernel." },
+          { "role": "user",      "content": "What is a Promise?" },
+          { "role": "assistant", "content": "A Promise is an object representing the eventual completion or failure of an asynchronous operation." },
+          { "role": "user",      "content": "What is async/await?" },
+          { "role": "assistant", "content": "async/await is syntactic sugar over Promises that makes asynchronous code look synchronous." },
+          { "role": "user",      "content": "What is a generator function?" },
+          { "role": "assistant", "content": "A generator function uses function* syntax and can pause execution with yield, resuming later." },
+          { "role": "user",      "content": "What is a WeakMap?" },
+          { "role": "assistant", "content": "A WeakMap holds key-value pairs where keys must be objects and are weakly referenced — they can be garbage collected." }
+        ],
+        "use_mcp": false,
+        "cwd": null
+      },
+      "evaluation": {
+        "type": "exact_match",
+        "expected_contains": ["reduce"],
+        "criteria": ""
+      }
+    },
+    {
+      "id": "C05",
+      "category": "history",
+      "description": "Histórico médio (6 pares, ~2900 chars), dado crítico no primeiro turno — trigga aggressive (2000), não trigga conservative (8000)",
+      "tags": ["history", "context-dependent", "medium", "threshold-aggressive"],
+      "critical": true,
+      "request": {
+        "provider": null,
+        "model": null,
+        "system_prompt": "You are a senior software engineer helping with code review and security analysis.",
+        "content": "What is the ticket number we are working on in this review session?",
+        "messages": [
+          { "role": "user",      "content": "I need help reviewing the auth module. We are fixing ticket AUTH-2891 which is about JWT tokens not expiring correctly when the server clock drifts more than 5 minutes." },
+          { "role": "assistant", "content": "Understood, working on ticket AUTH-2891. The problem is likely in the token verification step where the exp claim is compared against local server time. Clock drift between nodes can cause inconsistent results. Let me help you trace through the verification logic." },
+          { "role": "user",      "content": "The current check is: if (decoded.exp < Date.now() / 1000) throw new Error('expired'). The issue is Date.now uses system time and our servers are not in sync." },
+          { "role": "assistant", "content": "That confirms it. The fix is to add clock tolerance to the verification. The jsonwebtoken library supports a clockTolerance option. Change the call to jwt.verify(token, secret, { clockTolerance: 30 }) to allow 30 seconds of drift. This is the standard approach for distributed systems where perfect NTP sync is not guaranteed." },
+          { "role": "user",      "content": "Should we also check the iat claim to prevent tokens that were issued too far in the future?" },
+          { "role": "assistant", "content": "Yes, that is a good defensive measure. You can validate that iat is not more than your tolerance in the future. However, the most common attack vector is expired tokens being accepted, not future-issued tokens. Focus on the exp fix first. If you see future iat issues in production, add a check: if (decoded.iat > Date.now() / 1000 + 30) throw new Error('invalid iat')." },
+          { "role": "user",      "content": "Our tokens have a 15 minute expiry. Should we shorten that to improve security?" },
+          { "role": "assistant", "content": "15 minutes with a proper refresh flow is the correct pattern. Do not extend the access token expiry to work around the clock drift issue. The clockTolerance fix addresses the root cause without weakening security. Long-lived access tokens are a risk because a stolen token remains valid longer. Keep 15-minute access tokens and implement token rotation in the refresh endpoint." },
+          { "role": "user",      "content": "We use Redis to blacklist tokens after logout. The key is the full JWT string. Is that the right approach?" },
+          { "role": "assistant", "content": "No, storing the full JWT as the key is wasteful. Use the jti claim instead. It is a compact unique identifier, typically a UUID, that identifies the token. Store only the jti and set the Redis TTL to match the token expiry. This reduces memory usage significantly since jti values are 36 characters versus hundreds for a full JWT. Ensure your token generation always includes a jti claim." },
+          { "role": "user",      "content": "How long should we keep blacklisted jtis in Redis after the token expires?" },
+          { "role": "assistant", "content": "Keep the jti in Redis until the token natural expiration plus your clock tolerance buffer. For a 15-minute token with 30-second tolerance, set the Redis TTL to 15 minutes and 30 seconds from the token iat claim. This guarantees no blacklisted token can pass verification even at the edge of the tolerance window. Use Redis SET with EX to handle TTL automatically." }
+        ],
+        "use_mcp": false,
+        "cwd": null
+      },
+      "evaluation": {
+        "type": "exact_match",
+        "expected_contains": ["AUTH-2891"],
+        "criteria": ""
+      }
+    },
+    {
+      "id": "C06",
+      "category": "history",
+      "description": "Histórico longo (13 pares, ~8250 chars), dado crítico no ÚLTIMO par — conservative trunca pares antigos mas preserva dado recente",
+      "tags": ["history", "context-dependent", "very-long", "threshold-conservative", "recent-critical"],
+      "critical": false,
+      "request": {
+        "provider": null,
+        "model": null,
+        "system_prompt": "You are a senior software architect. Be concise but thorough.",
+        "content": "What is the deployment tag we noted for the notification gateway?",
+        "messages": [
+          { "role": "user",      "content": "We are redesigning our notification service to handle 50 million users. Currently we use a single PostgreSQL table for notification queues but performance is degrading at scale. Reads are slow and writes create lock contention during peak hours with about 2 million notifications per hour." },
+          { "role": "assistant", "content": "At 50 million users with 2 million notifications per hour, a relational database is the wrong tool for a queue. PostgreSQL was not designed for high-frequency queue patterns where rows are written and deleted rapidly. This creates table bloat and vacuum pressure in addition to lock contention. I recommend migrating to a dedicated message queue. Apache Kafka is the industry standard for this scale. It handles millions of events per second, stores data on disk efficiently, and supports consumer groups for horizontal scaling." },
+          { "role": "user",      "content": "Each notification is a small JSON payload of about 200 bytes. We need 7 days of retention. Would Redis Streams work or do we need Kafka?" },
+          { "role": "assistant", "content": "For 7-day retention at 2 million notifications per hour, you would accumulate about 336 million messages. At 200 bytes each that is roughly 67 GB. Redis Streams stores data in memory, so you would need 67 GB of RAM dedicated to the queue, which is expensive. Kafka stores data on disk with efficient compression, making 7-day retention trivial and cheap. Redis Streams is better for short retention windows under an hour. Go with Kafka for your requirements." },
+          { "role": "user",      "content": "We do not have Kafka expertise in-house. Our team knows AWS well. Would Kinesis be a good managed alternative?" },
+          { "role": "assistant", "content": "AWS Kinesis Data Streams is the managed equivalent of Kafka and the better fit for your requirements. SQS has a 14-day maximum retention which meets your 7-day need, but SQS lacks native fan-out to multiple consumers. Kinesis supports multiple consumer applications reading the same stream independently, has 7-day retention by default extendable to 365 days, and integrates natively with Lambda and other AWS services. For a team that knows AWS, Kinesis is operationally much simpler than self-hosted Kafka." },
+          { "role": "user",      "content": "We have three consumers that all need to see the same events: email delivery, push notifications, and in-app alerts. How does fan-out work with Kinesis?" },
+          { "role": "assistant", "content": "In Kinesis each consumer is registered as an Enhanced Fan-Out consumer. Each gets dedicated throughput of 2 MB per second per shard, independent of other consumers. Your email, push, and in-app workers all read the same stream concurrently without competing for throughput. Each consumer maintains its own checkpoint, so a slow email worker does not delay push delivery. You provision shards based on total write throughput: at 2 million events per hour with 200-byte payloads you need about 2 shards for comfortable headroom." },
+          { "role": "user",      "content": "What delivery guarantee does Kinesis provide? Can we tolerate occasional duplicate notifications?" },
+          { "role": "assistant", "content": "Kinesis provides at-least-once delivery. Duplicates can occur during shard rebalancing or when a consumer retries after a failure. For notifications, occasional duplicates are generally acceptable since the user simply sees the same message twice. If you need to prevent duplicates, implement idempotency on the consumer side by storing the Kinesis sequence number in Redis with a short TTL and skipping messages already seen. This check adds negligible overhead at your scale." },
+          { "role": "user",      "content": "Our email consumer uses SendGrid. What is the recommended pattern for the consumer worker?" },
+          { "role": "assistant", "content": "Pull batches of records from Kinesis, map each record to a SendGrid API call, call the API, and checkpoint only after all calls in the batch succeed. Use exponential backoff with jitter for transient SendGrid errors. Set your Kinesis checkpoint to the last successfully processed record so a partial batch failure retries correctly. Monitor your SendGrid rate limits and tune batch size and worker count to stay within them. Failed messages after maximum retries should go to a dead-letter SQS queue for manual review." },
+          { "role": "user",      "content": "For push notifications we use Firebase FCM. Is the same consumer pattern appropriate?" },
+          { "role": "assistant", "content": "Same pattern but with an important optimization. FCM supports batch sends of up to 500 messages per HTTP request via the batchSend endpoint. Unlike SendGrid where each email is a separate API call, you should accumulate a batch of up to 500 messages from Kinesis before calling FCM. This dramatically improves throughput. FCM returns per-message results so you can retry individual failures. Certain error codes like UNREGISTERED mean the device token is no longer valid and you should remove it from your database." },
+          { "role": "user",      "content": "In-app notifications should appear in real time in the browser without the user refreshing. How do we push updates to connected clients?" },
+          { "role": "assistant", "content": "Use Server-Sent Events for server-to-client real-time delivery. SSE is simpler than WebSockets because it is unidirectional over standard HTTP and works through proxies and load balancers. The client opens a persistent connection to your SSE endpoint. When the in-app Kinesis consumer processes a notification, it publishes to Redis Pub/Sub. Your SSE server subscribes to Redis and forwards events to the client connection by user ID. This separates the Kinesis consumer from connection management, letting you scale each independently." },
+          { "role": "user",      "content": "What happens to in-app notifications when the user is offline or has no active browser session?" },
+          { "role": "assistant", "content": "Store all notifications in PostgreSQL with a read boolean field defaulting to false. When the SSE consumer processes a message, it writes to PostgreSQL and then publishes to Redis Pub/Sub. If the user is connected they receive it immediately; if not, it sits in PostgreSQL. When the user next opens the app, the frontend fetches unread notifications from a REST endpoint querying for rows where user_id matches and read is false, ordered by created_at descending. This hybrid approach ensures no notification is ever lost." },
+          { "role": "user",      "content": "What database indexes do we need on the notifications table for this to perform well at scale?" },
+          { "role": "assistant", "content": "You need three indexes. First, a composite index on (user_id, read, created_at DESC) for the primary query pattern of fetching unread notifications ordered by recency. Make it a partial index filtering on read = false to reduce index size dramatically, since most notifications eventually get read. Second, an index on created_at for the cleanup job that purges old notifications. Third, if you support category filtering, a composite index on (user_id, category, read). Avoid indexing low-cardinality columns like read in isolation." },
+          { "role": "user",      "content": "Users can configure preferences to disable notifications by category. Where in the pipeline should we enforce these preferences?" },
+          { "role": "assistant", "content": "Enforce preferences at the producer before publishing to Kinesis, not in the consumers. If you check in the consumer, you have already paid the cost of traversing the entire pipeline only to discard the message. By filtering at the producer, unwanted messages never enter the queue. Cache user preferences in Redis with a 5-minute TTL to avoid a database read on every notification. On a cache miss, fall back to PostgreSQL. The producer reads from Redis; if the preference is disabled for that category it skips the publish entirely." },
+          { "role": "user",      "content": "We need to rate-limit notification frequency: no more than 5 notifications of the same category per hour per user. How do we implement this efficiently?" },
+          { "role": "assistant", "content": "Use a Redis sliding window rate limiter. The key pattern is notif:rate:{user_id}:{category}. The value is a sorted set where each member is a unique notification ID and the score is the Unix timestamp in seconds. On each notification attempt, add the current entry with ZADD, remove entries older than your window with ZREMRANGEBYSCORE, and check the count with ZCARD. If the count exceeds 5, drop or defer the notification. Wrap the three operations in a Lua script to make them atomic. This is O(log N) per check and scales to millions of users." },
+          { "role": "user",      "content": "One more thing — the deployment tag for the notification gateway release is DEPLOY-TAG-VEGA-3X. Make a note of that for our documentation." },
+          { "role": "assistant", "content": "Noted. Deployment tag DEPLOY-TAG-VEGA-3X recorded for the notification gateway release. I will reference it in the documentation and release checklist." }
+        ],
+        "use_mcp": false,
+        "cwd": null
+      },
+      "evaluation": {
+        "type": "llm_judge",
+        "expected_contains": [],
+        "criteria": "Does the response correctly identify 'DEPLOY-TAG-VEGA-3X' as the deployment tag for the notification gateway?"
+      }
+    },
+    {
+      "id": "C07",
+      "category": "history",
+      "description": "Histórico longo (13 pares, ~8200 chars), dado crítico no PRIMEIRO par — conservative remove o primeiro par e perde o identificador",
+      "tags": ["history", "context-dependent", "very-long", "threshold-conservative", "first-turn-critical"],
+      "critical": true,
+      "request": {
+        "provider": null,
+        "model": null,
+        "system_prompt": "You are a senior software architect. Be concise but thorough.",
+        "content": "What was the migration plan identifier I mentioned at the very start of our conversation?",
+        "messages": [
+          { "role": "user",      "content": "Before we begin, I want to log the migration plan identifier for this redesign: MIGR-PLAN-ZETA-5W. Please reference this throughout our discussion." },
+          { "role": "assistant", "content": "Migration plan identifier MIGR-PLAN-ZETA-5W noted for this notification service redesign project. I will reference it throughout our discussion." },
+          { "role": "user",      "content": "We are redesigning our notification service to handle 50 million users. Currently we use a single PostgreSQL table for notification queues but performance is degrading at scale. Reads are slow and writes create lock contention during peak hours with about 2 million notifications per hour." },
+          { "role": "assistant", "content": "At 50 million users with 2 million notifications per hour, a relational database is the wrong tool for a queue. PostgreSQL was not designed for high-frequency queue patterns where rows are written and deleted rapidly. This creates table bloat and vacuum pressure in addition to lock contention. I recommend migrating to a dedicated message queue. Apache Kafka is the industry standard for this scale. It handles millions of events per second, stores data on disk efficiently, and supports consumer groups for horizontal scaling." },
+          { "role": "user",      "content": "Each notification is a small JSON payload of about 200 bytes. We need 7 days of retention. Would Redis Streams work or do we need Kafka?" },
+          { "role": "assistant", "content": "For 7-day retention at 2 million notifications per hour, you would accumulate about 336 million messages. At 200 bytes each that is roughly 67 GB. Redis Streams stores data in memory, so you would need 67 GB of RAM dedicated to the queue, which is expensive. Kafka stores data on disk with efficient compression, making 7-day retention trivial and cheap. Redis Streams is better for short retention windows under an hour. Go with Kafka for your requirements." },
+          { "role": "user",      "content": "We do not have Kafka expertise in-house. Our team knows AWS well. Would Kinesis be a good managed alternative?" },
+          { "role": "assistant", "content": "AWS Kinesis Data Streams is the managed equivalent of Kafka and the better fit for your requirements. SQS has a 14-day maximum retention which meets your 7-day need, but SQS lacks native fan-out to multiple consumers. Kinesis supports multiple consumer applications reading the same stream independently, has 7-day retention by default extendable to 365 days, and integrates natively with Lambda and other AWS services. For a team that knows AWS, Kinesis is operationally much simpler than self-hosted Kafka." },
+          { "role": "user",      "content": "We have three consumers that all need to see the same events: email delivery, push notifications, and in-app alerts. How does fan-out work with Kinesis?" },
+          { "role": "assistant", "content": "In Kinesis each consumer is registered as an Enhanced Fan-Out consumer. Each gets dedicated throughput of 2 MB per second per shard, independent of other consumers. Your email, push, and in-app workers all read the same stream concurrently without competing for throughput. Each consumer maintains its own checkpoint, so a slow email worker does not delay push delivery. You provision shards based on total write throughput: at 2 million events per hour with 200-byte payloads you need about 2 shards for comfortable headroom." },
+          { "role": "user",      "content": "What delivery guarantee does Kinesis provide? Can we tolerate occasional duplicate notifications?" },
+          { "role": "assistant", "content": "Kinesis provides at-least-once delivery. Duplicates can occur during shard rebalancing or when a consumer retries after a failure. For notifications, occasional duplicates are generally acceptable since the user simply sees the same message twice. If you need to prevent duplicates, implement idempotency on the consumer side by storing the Kinesis sequence number in Redis with a short TTL and skipping messages already seen. This check adds negligible overhead at your scale." },
+          { "role": "user",      "content": "Our email consumer uses SendGrid. What is the recommended pattern for the consumer worker?" },
+          { "role": "assistant", "content": "Pull batches of records from Kinesis, map each record to a SendGrid API call, call the API, and checkpoint only after all calls in the batch succeed. Use exponential backoff with jitter for transient SendGrid errors. Set your Kinesis checkpoint to the last successfully processed record so a partial batch failure retries correctly. Monitor your SendGrid rate limits and tune batch size and worker count to stay within them. Failed messages after maximum retries should go to a dead-letter SQS queue for manual review." },
+          { "role": "user",      "content": "For push notifications we use Firebase FCM. Is the same consumer pattern appropriate?" },
+          { "role": "assistant", "content": "Same pattern but with an important optimization. FCM supports batch sends of up to 500 messages per HTTP request via the batchSend endpoint. Unlike SendGrid where each email is a separate API call, you should accumulate a batch of up to 500 messages from Kinesis before calling FCM. This dramatically improves throughput. FCM returns per-message results so you can retry individual failures. Certain error codes like UNREGISTERED mean the device token is no longer valid and you should remove it from your database." },
+          { "role": "user",      "content": "In-app notifications should appear in real time in the browser without the user refreshing. How do we push updates to connected clients?" },
+          { "role": "assistant", "content": "Use Server-Sent Events for server-to-client real-time delivery. SSE is simpler than WebSockets because it is unidirectional over standard HTTP and works through proxies and load balancers. The client opens a persistent connection to your SSE endpoint. When the in-app Kinesis consumer processes a notification, it publishes to Redis Pub/Sub. Your SSE server subscribes to Redis and forwards events to the client connection by user ID. This separates the Kinesis consumer from connection management, letting you scale each independently." },
+          { "role": "user",      "content": "What happens to in-app notifications when the user is offline or has no active browser session?" },
+          { "role": "assistant", "content": "Store all notifications in PostgreSQL with a read boolean field defaulting to false. When the SSE consumer processes a message, it writes to PostgreSQL and then publishes to Redis Pub/Sub. If the user is connected they receive it immediately; if not, it sits in PostgreSQL. When the user next opens the app, the frontend fetches unread notifications from a REST endpoint querying for rows where user_id matches and read is false, ordered by created_at descending. This hybrid approach ensures no notification is ever lost." },
+          { "role": "user",      "content": "What database indexes do we need on the notifications table for this to perform well at scale?" },
+          { "role": "assistant", "content": "You need three indexes. First, a composite index on (user_id, read, created_at DESC) for the primary query pattern of fetching unread notifications ordered by recency. Make it a partial index filtering on read = false to reduce index size dramatically, since most notifications eventually get read. Second, an index on created_at for the cleanup job that purges old notifications. Third, if you support category filtering, a composite index on (user_id, category, read). Avoid indexing low-cardinality columns like read in isolation." },
+          { "role": "user",      "content": "Users can configure preferences to disable notifications by category. Where in the pipeline should we enforce these preferences?" },
+          { "role": "assistant", "content": "Enforce preferences at the producer before publishing to Kinesis, not in the consumers. If you check in the consumer, you have already paid the cost of traversing the entire pipeline only to discard the message. By filtering at the producer, unwanted messages never enter the queue. Cache user preferences in Redis with a 5-minute TTL to avoid a database read on every notification. On a cache miss, fall back to PostgreSQL. The producer reads from Redis; if the preference is disabled for that category it skips the publish entirely." },
+          { "role": "user",      "content": "We need to rate-limit notification frequency: no more than 5 notifications of the same category per hour per user. How do we implement this efficiently?" },
+          { "role": "assistant", "content": "Use a Redis sliding window rate limiter. The key pattern is notif:rate:{user_id}:{category}. The value is a sorted set where each member is a unique notification ID and the score is the Unix timestamp in seconds. On each notification attempt, add the current entry with ZADD, remove entries older than your window with ZREMRANGEBYSCORE, and check the count with ZCARD. If the count exceeds 5, drop or defer the notification. Wrap the three operations in a Lua script to make them atomic. This is O(log N) per check and scales to millions of users." }
+        ],
+        "use_mcp": false,
+        "cwd": null
+      },
+      "evaluation": {
+        "type": "llm_judge",
+        "expected_contains": [],
+        "criteria": "Does the response correctly identify 'MIGR-PLAN-ZETA-5W' as the migration plan identifier mentioned at the start?"
+      }
+    }
+  ]
+}

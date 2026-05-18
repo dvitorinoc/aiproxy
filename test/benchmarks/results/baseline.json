@@ -1,0 +1,224 @@
+{
+  "version": "1.0.0",
+  "dataset_version": "1.1.0",
+  "run_at": 1779138006459,
+  "proxy_url": "http://localhost:9090",
+  "provider": "dataset",
+  "config_snapshot": {
+    "context_max_chars": 0,
+    "context_max_messages": 0
+  },
+  "summary": {
+    "total": 9,
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0,
+    "pending_judge": 0,
+    "error": 0,
+    "total_input_tokens": 27,
+    "total_cache_creation_tokens": 3300,
+    "total_effective_input_tokens": 3327,
+    "total_output_tokens": 336,
+    "avg_latency_ms": 4474
+  },
+  "cases": [
+    {
+      "id": "A01",
+      "category": "simple",
+      "critical": false,
+      "status": "passed",
+      "latency_ms": 4102,
+      "model_used": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_tokens": 0,
+        "effective_input_tokens": 3,
+        "output_tokens": 6,
+        "total_tokens": 9,
+        "cached_tokens": 12723
+      },
+      "output": "`object`",
+      "evaluation_result": {
+        "type": "exact_match",
+        "passed": true,
+        "detail": "Found: object"
+      }
+    },
+    {
+      "id": "A02",
+      "category": "simple",
+      "critical": false,
+      "status": "passed",
+      "latency_ms": 5023,
+      "model_used": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_tokens": 0,
+        "effective_input_tokens": 3,
+        "output_tokens": 5,
+        "total_tokens": 8,
+        "cached_tokens": 12721
+      },
+      "output": "12",
+      "evaluation_result": {
+        "type": "exact_match",
+        "passed": true,
+        "detail": "Found: 12"
+      }
+    },
+    {
+      "id": "C01",
+      "category": "history",
+      "critical": false,
+      "status": "passed",
+      "latency_ms": 4021,
+      "model_used": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_tokens": 0,
+        "effective_input_tokens": 3,
+        "output_tokens": 17,
+        "total_tokens": 20,
+        "cached_tokens": 12808
+      },
+      "output": "Run `npm install <package-name>` in your terminal.",
+      "evaluation_result": {
+        "type": "exact_match",
+        "passed": true,
+        "detail": "Found: npm install"
+      }
+    },
+    {
+      "id": "C02",
+      "category": "history",
+      "critical": false,
+      "status": "passed",
+      "latency_ms": 4018,
+      "model_used": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_tokens": 0,
+        "effective_input_tokens": 3,
+        "output_tokens": 58,
+        "total_tokens": 61,
+        "cached_tokens": 12926
+      },
+      "output": "You asked to rename the variable **`res`** to **`response`** inside the `getUserData` function.",
+      "evaluation_result": {
+        "type": "llm_judge",
+        "passed": true,
+        "detail": "pass: the response explicitly mentions 'res' as the original variable name that was renamed."
+      }
+    },
+    {
+      "id": "C03",
+      "category": "history",
+      "critical": true,
+      "status": "passed",
+      "latency_ms": 4021,
+      "model_used": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_tokens": 0,
+        "effective_input_tokens": 3,
+        "output_tokens": 66,
+        "total_tokens": 69,
+        "cached_tokens": 13147
+      },
+      "output": "Your secret code was **ALPHA-7734**.",
+      "evaluation_result": {
+        "type": "llm_judge",
+        "passed": true,
+        "detail": "pass: the response explicitly mentions 'ALPHA-7734' as the secret code."
+      }
+    },
+    {
+      "id": "C04",
+      "category": "history",
+      "critical": false,
+      "status": "passed",
+      "latency_ms": 4019,
+      "model_used": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_tokens": 0,
+        "effective_input_tokens": 3,
+        "output_tokens": 37,
+        "total_tokens": 40,
+        "cached_tokens": 13140
+      },
+      "output": "`Array.prototype.reduce` iterates over an array, applying a callback function that accumulates a single result from all elements, starting from an optional initial value.",
+      "evaluation_result": {
+        "type": "exact_match",
+        "passed": true,
+        "detail": "Found: reduce"
+      }
+    },
+    {
+      "id": "C05",
+      "category": "history",
+      "critical": true,
+      "status": "passed",
+      "latency_ms": 6022,
+      "model_used": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_tokens": 0,
+        "effective_input_tokens": 3,
+        "output_tokens": 44,
+        "total_tokens": 47,
+        "cached_tokens": 13462
+      },
+      "output": "The ticket number we are working on in this review session is **AUTH-2891**, which is about JWT tokens not expiring correctly when the server clock drifts more than 5 minutes.",
+      "evaluation_result": {
+        "type": "exact_match",
+        "passed": true,
+        "detail": "Found: AUTH-2891"
+      }
+    },
+    {
+      "id": "C06",
+      "category": "history",
+      "critical": false,
+      "status": "passed",
+      "latency_ms": 4022,
+      "model_used": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_tokens": 3300,
+        "effective_input_tokens": 3303,
+        "output_tokens": 72,
+        "total_tokens": 75,
+        "cached_tokens": 11367
+      },
+      "output": "The deployment tag noted for the notification gateway release is **DEPLOY-TAG-VEGA-3X**.",
+      "evaluation_result": {
+        "type": "llm_judge",
+        "passed": true,
+        "detail": "pass: the response correctly identifies 'DEPLOY-TAG-VEGA-3X' as the deployment tag for the notification gateway."
+      }
+    },
+    {
+      "id": "C07",
+      "category": "history",
+      "critical": true,
+      "status": "passed",
+      "latency_ms": 5022,
+      "model_used": null,
+      "usage": {
+        "input_tokens": 3,
+        "cache_creation_tokens": 0,
+        "effective_input_tokens": 3,
+        "output_tokens": 31,
+        "total_tokens": 34,
+        "cached_tokens": 14672
+      },
+      "output": "The migration plan identifier you mentioned at the start of our conversation was **MIGR-PLAN-ZETA-5W**.",
+      "evaluation_result": {
+        "type": "llm_judge",
+        "passed": true,
+        "detail": "pass: the response correctly identifies 'MIGR-PLAN-ZETA-5W' as the migration plan identifier mentioned at the start."
+      }
+    }
+  ]
+}
