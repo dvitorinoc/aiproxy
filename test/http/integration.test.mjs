@@ -26,16 +26,6 @@ mock.module('../../src/services/providers.service.mjs', {
   },
 })
 
-mock.module('../../src/sse/broadcaster.mjs', {
-  exports: {
-    addClient:    mock.fn(),
-    removeClient: mock.fn(),
-    triggerPoll:  mock.fn(),
-    startPolling: mock.fn(),
-    stopPolling:  mock.fn(),
-  },
-})
-
 // Providers mock — avoids loading the full provider chain (which needs full config)
 mock.module('../../src/providers/index.mjs', {
   exports: {

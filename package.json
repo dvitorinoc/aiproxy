@@ -3,11 +3,11 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "start":      "node server.mjs",
-    "queue":      "node src/queue/daemon.mjs",
-    "dev":        "node --watch server.mjs & node --watch src/queue/daemon.mjs",
-    "start:all":  "bash start.sh",
-    "stop:all":   "bash stop.sh",
+    "start":      "node --env-file-if-exists=.env server.mjs",
+    "queue":      "node --env-file-if-exists=.env src/queue/daemon.mjs",
+    "dev":        "node --env-file-if-exists=.env --watch server.mjs & node --env-file-if-exists=.env --watch src/queue/daemon.mjs",
+    "start:all":  "bash scripts/start.sh",
+    "stop:all":   "bash scripts/stop.sh",
     "test":       "node --experimental-test-module-mocks --test 'test/**/*.test.mjs'"
   }
 }

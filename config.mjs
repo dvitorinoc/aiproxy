@@ -1,46 +1,48 @@
-// AI Proxy — configurações centralizadas
+import { readFileSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+function loadMcpServers() {
+  try {
+    return JSON.parse(readFileSync(join(__dirname, 'mcp-servers.json'), 'utf8'))
+  } catch {
+    return []
+  }
+}
 
 export default {
-  // Porta HTTP do proxy
-  port: 9090,
+  port: +process.env.AI_PROXY_PORT || 9090,
 
-  // URL base da API Laravel (usada pelas ferramentas MCP e pelo poll SSE)
-  laravelApi: 'http://localhost:8000/api',
-
-  // Diretórios adicionados ao PATH ao invocar CLIs de IA
   path: {
-    nvmNode:  '/home/douglas/.nvm/versions/node/v24.15.0/bin',
-    localBin: '/home/douglas/.local/bin',
+    nvmNode:  process.env.AI_PROXY_NVM_NODE  || '',
+    localBin: process.env.AI_PROXY_LOCAL_BIN || '',
   },
 
-  // Timeouts de execução por provider (ms)
   timeouts: {
-    claude: 180_000,
-    gemini: 180_000,
-    codex:  240_000,
+    claude: +process.env.AI_PROXY_TIMEOUT_CLAUDE || 180_000,
+    gemini: +process.env.AI_PROXY_TIMEOUT_GEMINI || 180_000,
+    codex:  +process.env.AI_PROXY_TIMEOUT_CODEX  || 240_000,
   },
 
-  // Loop de ferramentas MCP
   mcp: {
-    maxIterations: 6,
-
-    // Servidores MCP externos (stdio). Cada entrada spawna um processo separado.
-    // O proxy descobre as ferramentas via tools/list e roteia tool_calls automaticamente.
-    // Exemplo:
-    //   { name: 'meu-projeto', command: 'node', args: ['../meu-projeto/mcp-server.mjs'] }
-    servers: [],
+    maxIterations: +process.env.AI_PROXY_MCP_MAX_ITERATIONS || 6,
+    servers: loadMcpServers(),
   },
 
-  // SSE: intervalo de poll da API Laravel para broadcast ao frontend (ms)
-  ssePollMs: 1_000,
+  webhook: {
+    url:    process.env.AI_PROXY_WEBHOOK_URL    || null,
+    secret: process.env.AI_PROXY_WEBHOOK_SECRET || null,
+  },
 
-  // Fila de execução (daemon separado)
   queue: {
-    port:           9091,
-    maxConcurrent:  3,
-    maxQueueSize:   50,           // 0 = ilimitado
-    jobTimeoutMs:   300_000,
-    dbPath:         './queue.db',
-    cleanupAfterMs: 24 * 60 * 60 * 1_000,
+    port:           +process.env.AI_PROXY_QUEUE_PORT           || 9091,
+    maxConcurrent:  +process.env.AI_PROXY_QUEUE_MAX_CONCURRENT || 3,
+    maxQueueSize:   +process.env.AI_PROXY_QUEUE_MAX_SIZE       || 50,
+    jobTimeoutMs:   +process.env.AI_PROXY_QUEUE_JOB_TIMEOUT    || 300_000,
+    pollMs:         +process.env.AI_PROXY_QUEUE_POLL_MS        || 1_000,
+    dbPath:          process.env.AI_PROXY_QUEUE_DB_PATH        || './queue.db',
+    cleanupAfterMs: +process.env.AI_PROXY_QUEUE_CLEANUP_AFTER  || 24 * 60 * 60 * 1_000,
   },
 }
