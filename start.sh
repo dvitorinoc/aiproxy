@@ -10,10 +10,13 @@ if [ -f "$PIDS_FILE" ]; then
   exit 1
 fi
 
-nohup node "$ROOT/src/queue/daemon.mjs" >> "$ROOT/logs/queue.log" 2>&1 &
+ENV_FLAG=""
+[ -f "$ROOT/.env" ] && ENV_FLAG="--env-file=$ROOT/.env"
+
+nohup node $ENV_FLAG "$ROOT/src/queue/daemon.mjs" >> "$ROOT/logs/queue.log" 2>&1 &
 QUEUE_PID=$!
 
-nohup node "$ROOT/server.mjs" >> "$ROOT/logs/server.log" 2>&1 &
+nohup node $ENV_FLAG "$ROOT/server.mjs" >> "$ROOT/logs/server.log" 2>&1 &
 SERVER_PID=$!
 
 echo "$SERVER_PID $QUEUE_PID" > "$PIDS_FILE"

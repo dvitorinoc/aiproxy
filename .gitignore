@@ -50,4 +50,5 @@ Thumbs.db
 
 .pids
 *.db
-config.mjs
+.env
+mcp-servers.json

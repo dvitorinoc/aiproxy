@@ -1,0 +1,10 @@
+[
+  {
+    "name": "my-project",
+    "command": "node",
+    "args": ["../my-project/mcp/server.mjs"],
+    "env": {
+      "AI_PROXY_API": "http://localhost:8000/api"
+    }
+  }
+]
